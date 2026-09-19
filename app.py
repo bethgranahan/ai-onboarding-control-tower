@@ -864,14 +864,7 @@ else:
         "Google Sheet URL or ID",
         placeholder="https://docs.google.com/spreadsheets/d/..."
     )
-    c1, c2 = st.columns([1,3])
-    with c1:
-        refresh = st.button("Load / Refresh Sheet", type="primary", use_container_width=True)
-    with c2:
-        st.caption(
-            "For the classroom demo, share the fictional Sheet as "
-            "'Anyone with the link — Viewer'."
-        )
+    refresh = st.button("Load / Refresh Sheet", type="primary", use_container_width=True)
 
     if sheet_url:
         # Streamlit reruns on every interaction, so the sheet is effectively refreshed
@@ -902,17 +895,60 @@ if missing:
 analyzed = prioritize_df(analyze_rows(raw_df, as_of_text))
 
 # -------------------------
-# Dashboard
+# Navigation + shared employee selection
 # -------------------------
-tabs = st.tabs([
+
+NAV_OPTIONS = [
     "Priority Dashboard",
     "Employee Detail",
     "Communications",
     "Rule Validation",
-    "About"
-])
+    "About",
+]
 
-with tabs[0]:
+# A dashboard row click requests a page change on the NEXT rerun.
+# Apply that request before the navigation widget is instantiated.
+if "requested_view" in st.session_state:
+    st.session_state["main_view"] = st.session_state.pop("requested_view")
+
+if "main_view" not in st.session_state:
+    st.session_state["main_view"] = "Priority Dashboard"
+
+if "selected_employee_id" not in st.session_state:
+    st.session_state["selected_employee_id"] = (
+        str(analyzed.iloc[0]["Employee ID"]) if len(analyzed) else None
+    )
+
+view = st.radio(
+    "Navigation",
+    NAV_OPTIONS,
+    key="main_view",
+    horizontal=True,
+    label_visibility="collapsed",
+)
+
+def _employee_choices(df):
+    return [f"{r['Employee ID']} — {r['Employee Name']}" for _, r in df.iterrows()]
+
+def _choice_index(choices, employee_id):
+    if not choices:
+        return 0
+    for i, choice in enumerate(choices):
+        if choice.split(" — ", 1)[0].strip() == str(employee_id):
+            return i
+    return 0
+
+def _sync_employee_from_widget(widget_key):
+    choice = st.session_state.get(widget_key)
+    if choice:
+        st.session_state["selected_employee_id"] = choice.split(" — ", 1)[0].strip()
+
+choices = _employee_choices(analyzed)
+
+# -------------------------
+# Priority Dashboard
+# -------------------------
+if view == "Priority Dashboard":
     st.subheader("Priority Control Tower")
     st.caption(f"Source: {source_label} | Days to Start recalculated as of {as_of_text}")
 
@@ -935,6 +971,11 @@ with tabs[0]:
         """
     )
 
+    st.info(
+        "💡 **Click any employee row below** to jump directly to that employee's detail page. "
+        "The same employee will also be preselected when you open Communications."
+    )
+
     display_cols = [
         "Priority","Employee ID","Employee Name","Department","Start Date","Days to Start",
         "Current Stage","Primary Bottleneck","Blocked Downstream Task","Next Action",
@@ -950,12 +991,25 @@ with tabs[0]:
             return ["background-color:#fff3cd"] * len(row)
         return ["background-color:#d1e7dd"] * len(row)
 
-    st.dataframe(
+    table_event = st.dataframe(
         disp.style.apply(color_priority, axis=1),
         use_container_width=True,
         hide_index=True,
-        height=560
+        height=560,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="priority_employee_table",
     )
+
+    selected_rows = table_event.selection.rows if table_event is not None else []
+    if selected_rows:
+        selected_row_pos = selected_rows[0]
+        if 0 <= selected_row_pos < len(disp):
+            clicked_emp = str(disp.iloc[selected_row_pos]["Employee ID"])
+            st.session_state["selected_employee_id"] = clicked_emp
+            st.session_state["requested_view"] = "Employee Detail"
+            # Clear the table selection state by forcing the page change.
+            st.rerun()
 
     fig_stage, fig_risk = make_plots(analyzed)
     p1,p2 = st.columns(2)
@@ -964,7 +1018,6 @@ with tabs[0]:
     with p2:
         st.plotly_chart(fig_risk, use_container_width=True)
 
-    # Download analyzed workbook.
     export_path = export_analysis(analyzed)
     with open(export_path, "rb") as f:
         st.download_button(
@@ -974,11 +1027,23 @@ with tabs[0]:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-with tabs[1]:
+# -------------------------
+# Employee Detail
+# -------------------------
+elif view == "Employee Detail":
     st.subheader("Employee Control Tower")
-    choices = [f"{r['Employee ID']} — {r['Employee Name']}" for _,r in analyzed.iterrows()]
-    selected = st.selectbox("Select employee", choices)
+
+    detail_index = _choice_index(choices, st.session_state.get("selected_employee_id"))
+    selected = st.selectbox(
+        "Select employee",
+        choices,
+        index=detail_index,
+        key="detail_emp",
+        on_change=_sync_employee_from_widget,
+        args=("detail_emp",),
+    )
     emp_id = selected.split(" — ",1)[0]
+    st.session_state["selected_employee_id"] = emp_id
     row = analyzed[analyzed["Employee ID"].astype(str)==emp_id].iloc[0]
 
     p = row["Priority"]
@@ -1008,14 +1073,33 @@ with tabs[1]:
     )
     st.dataframe(checklist, use_container_width=True, hide_index=True)
 
-with tabs[2]:
+    b1, b2 = st.columns([1, 3])
+    with b1:
+        if st.button("✉️ Draft follow-up email", type="primary", use_container_width=True):
+            st.session_state["requested_view"] = "Communications"
+            st.rerun()
+    with b2:
+        st.caption(
+            "The Communications page will open with this employee already selected."
+        )
+
+# -------------------------
+# Communications
+# -------------------------
+elif view == "Communications":
     st.subheader("Draft Follow-Up Email")
+
+    comm_index = _choice_index(choices, st.session_state.get("selected_employee_id"))
     selected2 = st.selectbox(
         "Employee for communication",
-        [f"{r['Employee ID']} — {r['Employee Name']}" for _,r in analyzed.iterrows()],
-        key="comm_emp"
+        choices,
+        index=comm_index,
+        key="comm_emp",
+        on_change=_sync_employee_from_widget,
+        args=("comm_emp",),
     )
     emp_id2 = selected2.split(" — ",1)[0]
+    st.session_state["selected_employee_id"] = emp_id2
     row2 = analyzed[analyzed["Employee ID"].astype(str)==emp_id2].iloc[0]
 
     route = resolve_recipient(
@@ -1030,15 +1114,20 @@ with tabs[2]:
         "Recipient comes from workflow ownership + contact data, not AI guessing."
     )
 
-    to_email = st.text_input("To", value=route["to"])
-    cc_email = st.text_input("CC", value=route["cc"])
-    subject = st.text_input("Subject", value=suggested_subject(row2))
+    to_email = st.text_input("To", value=route["to"], key=f"to_{emp_id2}")
+    cc_email = st.text_input("CC", value=route["cc"], key=f"cc_{emp_id2}")
+    subject = st.text_input("Subject", value=suggested_subject(row2), key=f"subject_{emp_id2}")
     body_default = deterministic_reminder(
         row2,
         sender_name=sender_name,
         recipient_role=route["role"]
     )
-    body = st.text_area("Email body", value=body_default, height=260)
+    body = st.text_area(
+        "Email body",
+        value=body_default,
+        height=260,
+        key=f"body_{emp_id2}"
+    )
 
     if to_email:
         params = {"view":"cm","fs":"1","to":to_email,"su":subject,"body":body}
@@ -1054,14 +1143,20 @@ with tabs[2]:
     if st.button("Send Email (Demo)"):
         st.success("Demo email logged as sent. No external email was transmitted.")
 
-with tabs[3]:
+# -------------------------
+# Rule Validation
+# -------------------------
+elif view == "Rule Validation":
     st.subheader("Rule Validation")
     md, val = validate_test_cases(analyzed, test_df)
     st.markdown(md)
     if len(val):
         st.dataframe(val, use_container_width=True, hide_index=True)
 
-with tabs[4]:
+# -------------------------
+# About
+# -------------------------
+elif view == "About":
     st.subheader("About the Prototype")
     st.markdown("""
 **Core design**
