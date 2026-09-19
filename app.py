@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import tempfile
 import html
 import urllib.parse
