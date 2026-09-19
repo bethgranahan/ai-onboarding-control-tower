@@ -814,91 +814,236 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🧭 AI-Enabled Employee Onboarding Control Tower")
+# -----------------------------------------------------------------------------
+# PAGE TITLE
+# -----------------------------------------------------------------------------
+
+st.title("🧭 AI ON-BOARDING Control Tower")
 st.caption("Group 6 classroom prototype — fictional/mock employee data only")
 
-st.info(
-    "The workflow engine determines status, blockers, ownership, and recipient role. "
-    "AI may help draft communication language, but it does not invent HR requirements "
-    "or email addresses."
-)
+# -----------------------------------------------------------------------------
+# SIDEBAR / SESSION SETTINGS
+# -----------------------------------------------------------------------------
 
-# -------------------------
-# Sidebar / session settings
-# -------------------------
 with st.sidebar:
     st.header("Session Settings")
-    sender_name = st.text_input("Current HR user name", "Demo HR Coordinator")
-    sender_email = st.text_input("Current HR user email", "hr.onboarding@example.com")
-    default_it_email = st.text_input("Default IT contact email", "it.access@example.com")
-    as_of_text = st.date_input("As-of date", value=date.today()).isoformat()
+
+    sender_name = st.text_input(
+        "Current HR user name",
+        "Demo HR Coordinator"
+    )
+
+    sender_email = st.text_input(
+        "Current HR user email",
+        "hr.onboarding@example.com"
+    )
+
+    default_it_email = st.text_input(
+        "Default IT contact email",
+        "it.access@example.com"
+    )
+
+    as_of_text = st.date_input(
+        "As-of date",
+        value=date.today()
+    ).isoformat()
 
     st.divider()
-    st.subheader("Data Source")
-    source_type = st.radio("Choose source", ["Excel upload", "Live Google Sheet"])
 
-# -------------------------
-# Load data
-# -------------------------
+    st.subheader("Data Source")
+
+    source_type = st.radio(
+        "Choose source",
+        ["Excel upload", "Live Google Sheet"]
+    )
+
+# -----------------------------------------------------------------------------
+# LOAD DATA
+# -----------------------------------------------------------------------------
+
 raw_df = None
 test_df = pd.DataFrame()
 contact_df = pd.DataFrame()
 source_label = ""
 
 if source_type == "Excel upload":
-    uploaded = st.file_uploader("Upload onboarding Excel workbook", type=["xlsx","xls"])
+
+    uploaded = st.file_uploader(
+        "Upload onboarding Excel workbook",
+        type=["xlsx", "xls"]
+    )
+
     if uploaded is not None:
+
         try:
+
             xls = pd.ExcelFile(uploaded)
-            emp_sheet = "Employee_Data" if "Employee_Data" in xls.sheet_names else xls.sheet_names[0]
-            raw_df = pd.read_excel(uploaded, sheet_name=emp_sheet)
+
+            emp_sheet = (
+                "Employee_Data"
+                if "Employee_Data" in xls.sheet_names
+                else xls.sheet_names[0]
+            )
+
+            raw_df = pd.read_excel(
+                uploaded,
+                sheet_name=emp_sheet
+            )
+
             if "Test_Cases" in xls.sheet_names:
-                test_df = pd.read_excel(uploaded, sheet_name="Test_Cases")
+                test_df = pd.read_excel(
+                    uploaded,
+                    sheet_name="Test_Cases"
+                )
+
             if "Contact_Directory" in xls.sheet_names:
-                contact_df = pd.read_excel(uploaded, sheet_name="Contact_Directory")
+                contact_df = pd.read_excel(
+                    uploaded,
+                    sheet_name="Contact_Directory"
+                )
+
             source_label = f"Excel: {uploaded.name}"
+
         except Exception as e:
-            st.error(f"Could not read workbook: {e}")
+
+            st.error(
+                f"Could not read workbook: {e}"
+            )
+
 else:
+
     sheet_url = st.text_input(
         "Google Sheet URL or ID",
         placeholder="https://docs.google.com/spreadsheets/d/..."
     )
-    refresh = st.button("Load / Refresh Sheet", type="primary", use_container_width=True)
+
+    refresh = st.button(
+        "Load / Refresh Sheet",
+        type="primary",
+        use_container_width=True
+    )
 
     if sheet_url:
-        # Streamlit reruns on every interaction, so the sheet is effectively refreshed
-        # whenever the page reruns or the button is clicked.
+
         try:
-            raw_df = read_public_google_sheet(sheet_url, "Employee_Data")
+
+            raw_df = read_public_google_sheet(
+                sheet_url,
+                "Employee_Data"
+            )
+
             try:
-                test_df = read_public_google_sheet(sheet_url, "Test_Cases")
+
+                test_df = read_public_google_sheet(
+                    sheet_url,
+                    "Test_Cases"
+                )
+
             except Exception:
+
                 test_df = pd.DataFrame()
+
             try:
-                contact_df = read_public_google_sheet(sheet_url, "Contact_Directory")
+
+                contact_df = read_public_google_sheet(
+                    sheet_url,
+                    "Contact_Directory"
+                )
+
             except Exception:
+
                 contact_df = pd.DataFrame()
+
             source_label = "Live Google Sheet"
+
         except Exception as e:
+
             st.error(str(e))
 
+# -----------------------------------------------------------------------------
+# STOP IF NO DATA
+# -----------------------------------------------------------------------------
+
 if raw_df is None:
-    st.warning("Load an Excel workbook or a live Google Sheet to begin.")
+
+    st.info(
+        "Please upload the onboarding Excel workbook or enter a "
+        "public Google Sheet URL to begin."
+    )
+
+    st.markdown(
+        """
+        ### Welcome to the AI Onboarding Control Tower
+
+        This prototype helps HR monitor employee onboarding status,
+        identify missing onboarding requirements, and prioritize
+        employees who may need follow-up.
+        """
+    )
+
     st.stop()
+
+# -----------------------------------------------------------------------------
+# VALIDATE DATA
+# -----------------------------------------------------------------------------
 
 missing = validate_schema(raw_df)
+
 if missing:
-    st.error("Missing required columns: " + ", ".join(missing))
+
+    st.error(
+        "Missing required columns: " +
+        ", ".join(missing)
+    )
+
     st.stop()
 
-analyzed = prioritize_df(analyze_rows(raw_df, as_of_text))
+# -----------------------------------------------------------------------------
+# ANALYZE DATA
+# -----------------------------------------------------------------------------
 
-# -------------------------
-# Navigation + shared employee selection
-# -------------------------
+analyzed = prioritize_df(
+    analyze_rows(
+        raw_df,
+        as_of_text
+    )
+)
+
+# Make sure Employee ID is treated consistently as text
+analyzed["Employee ID"] = (
+    analyzed["Employee ID"]
+    .astype(str)
+    .str.strip()
+)
+
+# -----------------------------------------------------------------------------
+# SESSION STATE
+# -----------------------------------------------------------------------------
+
+if "main_view" not in st.session_state:
+
+    st.session_state["main_view"] = "Home"
+
+if "selected_employee_id" not in st.session_state:
+
+    if len(analyzed) > 0:
+
+        st.session_state["selected_employee_id"] = (
+            str(analyzed.iloc[0]["Employee ID"])
+        )
+
+    else:
+
+        st.session_state["selected_employee_id"] = None
+
+# -----------------------------------------------------------------------------
+# NAVIGATION OPTIONS
+# -----------------------------------------------------------------------------
 
 NAV_OPTIONS = [
+    "Home",
+    "Search Employee",
+    "Employee Statistics",
     "Priority Dashboard",
     "Employee Detail",
     "Communications",
@@ -906,120 +1051,850 @@ NAV_OPTIONS = [
     "About",
 ]
 
-# A dashboard row click requests a page change on the NEXT rerun.
-# Apply that request before the navigation widget is instantiated.
-if "requested_view" in st.session_state:
-    st.session_state["main_view"] = st.session_state.pop("requested_view")
-
-if "main_view" not in st.session_state:
-    st.session_state["main_view"] = "Priority Dashboard"
-
-if "selected_employee_id" not in st.session_state:
-    st.session_state["selected_employee_id"] = (
-        str(analyzed.iloc[0]["Employee ID"]) if len(analyzed) else None
-    )
-
 view = st.radio(
     "Navigation",
     NAV_OPTIONS,
     key="main_view",
     horizontal=True,
-    label_visibility="collapsed",
+    label_visibility="collapsed"
 )
 
+# -----------------------------------------------------------------------------
+# HELPER FUNCTIONS
+# -----------------------------------------------------------------------------
+
 def _employee_choices(df):
-    return [f"{r['Employee ID']} — {r['Employee Name']}" for _, r in df.iterrows()]
+
+    return [
+        f"{r['Employee ID']} — {r['Employee Name']}"
+        for _, r in df.iterrows()
+    ]
+
 
 def _choice_index(choices, employee_id):
+
     if not choices:
+
         return 0
+
     for i, choice in enumerate(choices):
-        if choice.split(" — ", 1)[0].strip() == str(employee_id):
+
+        if (
+            choice.split(" — ", 1)[0].strip()
+            == str(employee_id)
+        ):
+
             return i
+
     return 0
 
+
 def _sync_employee_from_widget(widget_key):
+
     choice = st.session_state.get(widget_key)
+
     if choice:
-        st.session_state["selected_employee_id"] = choice.split(" — ", 1)[0].strip()
 
-choices = _employee_choices(analyzed)
+        st.session_state["selected_employee_id"] = (
+            choice.split(" — ", 1)[0].strip()
+        )
 
-# -------------------------
-# Priority Dashboard
-# -------------------------
-if view == "Priority Dashboard":
-    st.subheader("Priority Control Tower")
-    st.caption(f"Source: {source_label} | Days to Start recalculated as of {as_of_text}")
 
-    total = len(analyzed)
-    red_n = int((analyzed["Priority"]=="Red").sum())
-    yellow_n = int((analyzed["Priority"]=="Yellow").sum())
-    green_n = int((analyzed["Priority"]=="Green").sum())
+def show_employee_detail(row):
 
-    m1,m2,m3,m4 = st.columns(4)
-    m1.metric("Employees", total)
-    m2.metric("🔴 Urgent", red_n)
-    m3.metric("🟡 Pending", yellow_n)
-    m4.metric("🟢 Complete", green_n)
+    """
+    Displays the employee information required by the assignment.
+    """
+
+    employee_name = _norm(
+        row.get("Employee Name")
+    )
+
+    employee_id = _norm(
+        row.get("Employee ID")
+    )
+
+    department = _norm(
+        row.get("Department")
+    )
+
+    employee_email = _norm(
+        row.get("Employee Email")
+    )
+
+    start_date = _fmt_start_date(
+        row.get("Start Date")
+    )
+
+    core_pct = row.get(
+        "Core Checklist %",
+        0
+    )
+
+    try:
+
+        core_pct_display = (
+            f"{float(core_pct) * 100:.0f}%"
+        )
+
+    except Exception:
+
+        core_pct_display = "N/A"
+
+    core_ready = _norm(
+        row.get("Core Checklist Ready?")
+    )
+
+    risk = _norm(
+        row.get("Risk Level")
+    )
+
+    priority = _norm(
+        row.get("Priority")
+    )
+
+    priority_icon = {
+        "Red": "🔴",
+        "Yellow": "🟡",
+        "Green": "🟢"
+    }.get(priority, "")
+
+    # ---------------------------------------------------------
+    # Employee Header
+    # ---------------------------------------------------------
+
+    st.markdown(
+        f"## {employee_name}"
+    )
+
+    st.caption(
+        f"Employee ID: {employee_id}"
+    )
+
+    # ---------------------------------------------------------
+    # Employee Information
+    # ---------------------------------------------------------
+
+    st.markdown("### Employee Information")
+
+    info1, info2, info3, info4 = st.columns(4)
+
+    info1.metric(
+        "Employee ID",
+        employee_id
+    )
+
+    info2.metric(
+        "Department",
+        department if department else "N/A"
+    )
+
+    info3.metric(
+        "Start Date",
+        start_date
+    )
+
+    info4.metric(
+        "Risk Level",
+        risk if risk else "N/A"
+    )
+
+    info5, info6, info7, info8 = st.columns(4)
+
+    info5.metric(
+        "Employee Email",
+        employee_email if employee_email else "N/A"
+    )
+
+    info6.metric(
+        "Core Checklist %",
+        core_pct_display
+    )
+
+    info7.metric(
+        "Core Checklist Ready?",
+        core_ready if core_ready else "N/A"
+    )
+
+    info8.metric(
+        "Priority",
+        f"{priority_icon} {priority}"
+        if priority
+        else "N/A"
+    )
+
+    st.divider()
+
+    # ---------------------------------------------------------
+    # Workflow Information
+    # ---------------------------------------------------------
+
+    st.markdown("### Onboarding Status")
+
+    st.markdown(
+        f"**Current Stage:** "
+        f"{_norm(row.get('Current Stage'))}"
+    )
+
+    st.markdown(
+        f"**Primary Bottleneck:** "
+        f"{_norm(row.get('Primary Bottleneck'))}"
+    )
+
+    st.markdown(
+        f"**Blocked Downstream Task:** "
+        f"{_norm(row.get('Blocked Downstream Task'))}"
+    )
+
+    st.markdown(
+        f"**Next Action:** "
+        f"{_norm(row.get('Next Action'))}"
+    )
+
+    st.markdown(
+        f"**Responsible Party:** "
+        f"{_norm(row.get('Responsible Party'))}"
+    )
+
+    explanation = _norm(
+        row.get("Control Tower Explanation")
+    )
+
+    if explanation:
+
+        st.info(explanation)
+
+    # ---------------------------------------------------------
+    # Missing Categories
+    # ---------------------------------------------------------
+
+    st.markdown("### Onboarding Checklist")
+
+    checklist_rows = []
+
+    all_checklist_items = (
+        CORE_CHECKLIST +
+        ["SafeColleges"]
+    )
+
+    for item in all_checklist_items:
+
+        status = _norm(
+            row.get(item)
+        )
+
+        if not status:
+            status = "Missing"
+
+        checklist_rows.append(
+            {
+                "Category": item,
+                "Status": status
+            }
+        )
+
+    checklist = pd.DataFrame(
+        checklist_rows
+    )
+
+    st.dataframe(
+        checklist,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    # ---------------------------------------------------------
+    # Additional System Status
+    # ---------------------------------------------------------
+
+    st.markdown(
+        "### Additional Onboarding System Status"
+    )
+
+    system_rows = [
+        {
+            "Category": "HRIS Employee ID",
+            "Status": _norm(
+                row.get("HRIS Employee ID")
+            )
+        },
+        {
+            "Category": "Payroll Screens",
+            "Status": _norm(
+                row.get("Payroll Screens")
+            )
+        },
+        {
+            "Category": "HR Notified IT",
+            "Status": _norm(
+                row.get("HR Notified IT")
+            )
+        },
+        {
+            "Category": "IT Email/System Access",
+            "Status": _norm(
+                row.get("IT Email/System Access")
+            )
+        },
+    ]
+
+    st.dataframe(
+        pd.DataFrame(system_rows),
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# -----------------------------------------------------------------------------
+# HOME PAGE
+# -----------------------------------------------------------------------------
+
+if view == "Home":
 
     st.markdown(
         """
-        **Priority logic:** 🔴 pending + start date within 7 days/overdue;
-        🟡 pending + later start date; 🟢 fully operational.
-        Within the same urgency/date, farther-downstream blockers are surfaced first.
-        """
+        <div style="
+            padding: 35px;
+            border-radius: 15px;
+            background-color: #F4F7FA;
+            text-align: center;
+            margin-bottom: 30px;
+        ">
+
+        <h1>WELCOME TO AI ON-BOARDING Control Tower</h1>
+
+        <p style="font-size:18px;">
+        Monitor new employee onboarding status, identify missing
+        requirements, and quickly find employees who need follow-up.
+        </p>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown("### What would you like to do?")
+
+    h1, h2 = st.columns(2)
+
+    with h1:
+
+        st.markdown(
+            """
+            ### 🔎 Search for New Employee Status
+
+            Search for a new employee using:
+
+            - Employee ID
+            - Employee Name
+            - Department
+
+            View onboarding checklist status, missing categories,
+            department, start date, and readiness.
+            """
+        )
+
+        if st.button(
+            "Search for New Employee Status",
+            type="primary",
+            use_container_width=True
+        ):
+
+            st.session_state["main_view"] = (
+                "Search Employee"
+            )
+
+            st.rerun()
+
+    with h2:
+
+        st.markdown(
+            """
+            ### 📊 New Employees' Statistics
+
+            Review the employee onboarding risk list.
+
+            Employees with higher risk appear first so HR can
+            quickly identify who may need attention.
+            """
+        )
+
+        if st.button(
+            "View New Employees' Statistics",
+            type="primary",
+            use_container_width=True
+        ):
+
+            st.session_state["main_view"] = (
+                "Employee Statistics"
+            )
+
+            st.rerun()
+
+    st.divider()
+
+    st.markdown(
+        f"**Data source:** {source_label}"
+    )
+
+    st.caption(
+        "This classroom prototype uses fictional/mock employee data."
+    )
+
+
+# -----------------------------------------------------------------------------
+# SEARCH EMPLOYEE
+# -----------------------------------------------------------------------------
+
+elif view == "Search Employee":
+
+    st.subheader(
+        "🔎 Search for New Employee Status"
+    )
+
+    st.write(
+        "Search using Employee ID, Employee Name, or Department."
     )
 
     st.info(
-        "💡 **Click any employee row below** to jump directly to that employee's detail page. "
-        "The same employee will also be preselected when you open Communications."
+        "You can use one search field at a time. "
+        "Department search will show all employees in that department."
+    )
+
+    search_id = st.text_input(
+        "Employee ID",
+        placeholder="Example: NH001"
+    )
+
+    search_name = st.text_input(
+        "Employee Name",
+        placeholder="Example: Jane Smith"
+    )
+
+    departments = sorted(
+        [
+            d for d in
+            analyzed["Department"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .unique()
+            if d
+        ]
+    )
+
+    department_options = [
+        "Select a department"
+    ] + departments
+
+    search_department = st.selectbox(
+        "Department",
+        department_options
+    )
+
+    # ---------------------------------------------------------
+    # Search logic
+    # ---------------------------------------------------------
+
+    filtered = analyzed.copy()
+
+    search_performed = False
+
+    # Employee ID search
+    if search_id.strip():
+
+        search_performed = True
+
+        query = search_id.strip().lower()
+
+        filtered = filtered[
+            filtered["Employee ID"]
+            .astype(str)
+            .str.lower()
+            .str.contains(
+                query,
+                na=False
+            )
+        ]
+
+    # Employee Name search
+    elif search_name.strip():
+
+        search_performed = True
+
+        query = search_name.strip().lower()
+
+        filtered = filtered[
+            filtered["Employee Name"]
+            .astype(str)
+            .str.lower()
+            .str.contains(
+                query,
+                na=False
+            )
+        ]
+
+    # Department search
+    elif search_department != "Select a department":
+
+        search_performed = True
+
+        filtered = filtered[
+            filtered["Department"]
+            .astype(str)
+            .str.strip()
+            == search_department
+        ]
+
+    if search_performed:
+
+        if filtered.empty:
+
+            st.warning(
+                "No employees were found matching your search."
+            )
+
+        else:
+
+            st.success(
+                f"{len(filtered)} employee(s) found."
+            )
+
+            # -------------------------------------------------
+            # Department search
+            # -------------------------------------------------
+
+            if (
+                search_department != "Select a department"
+                and not search_id.strip()
+                and not search_name.strip()
+            ):
+
+                st.markdown(
+                    f"### New Employees in {search_department}"
+                )
+
+                department_display = filtered[
+                    [
+                        "Employee ID",
+                        "Employee Name",
+                        "Department",
+                        "Start Date",
+                        "Core Checklist %",
+                        "Core Checklist Ready?",
+                        "Risk Level",
+                    ]
+                ].copy()
+
+                department_display[
+                    "Core Checklist %"
+                ] = (
+                    department_display[
+                        "Core Checklist %"
+                    ] * 100
+                ).round(0).astype(int).astype(str) + "%"
+
+                department_display[
+                    "Start Date"
+                ] = department_display[
+                    "Start Date"
+                ].apply(_fmt_start_date)
+
+                st.dataframe(
+                    department_display,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+            # -------------------------------------------------
+            # Employee ID or Name search
+            # -------------------------------------------------
+
+            employee_choices = _employee_choices(
+                filtered
+            )
+
+            if len(employee_choices) == 1:
+
+                selected_choice = employee_choices[0]
+
+            else:
+
+                selected_choice = st.selectbox(
+                    "Select an employee to view details",
+                    employee_choices
+                )
+
+            selected_id = selected_choice.split(
+                " — ",
+                1
+            )[0].strip()
+
+            selected_rows = analyzed[
+                analyzed["Employee ID"].astype(str)
+                == selected_id
+            ]
+
+            if not selected_rows.empty:
+
+                selected_row = selected_rows.iloc[0]
+
+                st.divider()
+
+                show_employee_detail(
+                    selected_row
+                )
+
+                st.session_state[
+                    "selected_employee_id"
+                ] = selected_id
+
+    else:
+
+        st.markdown(
+            """
+            ### Search instructions
+
+            Enter an **Employee ID**, **Employee Name**, or choose a
+            **Department** above to view onboarding information.
+            """
+        )
+
+
+# -----------------------------------------------------------------------------
+# EMPLOYEE STATISTICS
+# -----------------------------------------------------------------------------
+
+elif view == "Employee Statistics":
+
+    st.subheader(
+        "📊 New Employees' Statistics"
+    )
+
+    st.write(
+        "Employees are ordered by risk level, with higher-risk "
+        "employees displayed first."
+    )
+
+    risk_order = {
+        "Critical": 0,
+        "High": 1,
+        "Medium": 2,
+        "Low": 3,
+        "Complete": 4
+    }
+
+    statistics = analyzed.copy()
+
+    statistics["_risk_order"] = (
+        statistics["Risk Level"]
+        .map(risk_order)
+        .fillna(99)
+    )
+
+    statistics = statistics.sort_values(
+        by=[
+            "_risk_order",
+            "Employee Name"
+        ],
+        ascending=[
+            True,
+            True
+        ]
+    )
+
+    statistics_display = statistics[
+        [
+            "Employee Name",
+            "Risk Level",
+            "Employee Email"
+        ]
+    ].copy()
+
+    statistics_display[
+        "Employee Email"
+    ] = statistics_display[
+        "Employee Email"
+    ].fillna("")
+
+    st.dataframe(
+        statistics_display,
+        use_container_width=True,
+        hide_index=True
+    )
+
+    st.divider()
+
+    st.markdown(
+        "### Risk Summary"
+    )
+
+    critical_n = int(
+        (analyzed["Risk Level"] == "Critical").sum()
+    )
+
+    high_n = int(
+        (analyzed["Risk Level"] == "High").sum()
+    )
+
+    medium_n = int(
+        (analyzed["Risk Level"] == "Medium").sum()
+    )
+
+    low_n = int(
+        (analyzed["Risk Level"] == "Low").sum()
+    )
+
+    complete_n = int(
+        (analyzed["Risk Level"] == "Complete").sum()
+    )
+
+    s1, s2, s3, s4, s5 = st.columns(5)
+
+    s1.metric(
+        "Critical",
+        critical_n
+    )
+
+    s2.metric(
+        "High",
+        high_n
+    )
+
+    s3.metric(
+        "Medium",
+        medium_n
+    )
+
+    s4.metric(
+        "Low",
+        low_n
+    )
+
+    s5.metric(
+        "Complete",
+        complete_n
+    )
+
+
+# -----------------------------------------------------------------------------
+# PRIORITY DASHBOARD
+# -----------------------------------------------------------------------------
+
+elif view == "Priority Dashboard":
+
+    st.subheader(
+        "Priority Control Tower"
+    )
+
+    st.caption(
+        f"Source: {source_label} | "
+        f"Days to Start recalculated as of {as_of_text}"
+    )
+
+    total = len(analyzed)
+
+    red_n = int(
+        (analyzed["Priority"] == "Red").sum()
+    )
+
+    yellow_n = int(
+        (analyzed["Priority"] == "Yellow").sum()
+    )
+
+    green_n = int(
+        (analyzed["Priority"] == "Green").sum()
+    )
+
+    m1, m2, m3, m4 = st.columns(4)
+
+    m1.metric(
+        "Employees",
+        total
+    )
+
+    m2.metric(
+        "🔴 Urgent",
+        red_n
+    )
+
+    m3.metric(
+        "🟡 Pending",
+        yellow_n
+    )
+
+    m4.metric(
+        "🟢 Complete",
+        green_n
+    )
+
+    st.markdown(
+        """
+        **Priority logic:**
+
+        🔴 Pending + start date within 7 days/overdue
+
+        🟡 Pending + later start date
+
+        🟢 Fully operational
+        """
     )
 
     display_cols = [
-        "Priority","Employee ID","Employee Name","Department","Start Date","Days to Start",
-        "Current Stage","Primary Bottleneck","Blocked Downstream Task","Next Action",
-        "Responsible Party","Risk Level"
+        "Priority",
+        "Employee ID",
+        "Employee Name",
+        "Department",
+        "Start Date",
+        "Days to Start",
+        "Current Stage",
+        "Primary Bottleneck",
+        "Blocked Downstream Task",
+        "Next Action",
+        "Responsible Party",
+        "Risk Level"
     ]
-    disp = analyzed[display_cols].copy()
 
-    def color_priority(row):
-        p = row["Priority"]
-        if p == "Red":
-            return ["background-color:#f8d7da"] * len(row)
-        if p == "Yellow":
-            return ["background-color:#fff3cd"] * len(row)
-        return ["background-color:#d1e7dd"] * len(row)
+    disp = analyzed[
+        display_cols
+    ].copy()
 
-    table_event = st.dataframe(
-        disp.style.apply(color_priority, axis=1),
+    st.dataframe(
+        disp,
         use_container_width=True,
         hide_index=True,
-        height=560,
-        on_select="rerun",
-        selection_mode="single-row",
-        key="priority_employee_table",
+        height=560
     )
 
-    selected_rows = table_event.selection.rows if table_event is not None else []
-    if selected_rows:
-        selected_row_pos = selected_rows[0]
-        if 0 <= selected_row_pos < len(disp):
-            clicked_emp = str(disp.iloc[selected_row_pos]["Employee ID"])
-            st.session_state["selected_employee_id"] = clicked_emp
-            st.session_state["requested_view"] = "Employee Detail"
-            # Clear the table selection state by forcing the page change.
-            st.rerun()
+    fig_stage, fig_risk = make_plots(
+        analyzed
+    )
 
-    fig_stage, fig_risk = make_plots(analyzed)
-    p1,p2 = st.columns(2)
+    p1, p2 = st.columns(2)
+
     with p1:
-        st.plotly_chart(fig_stage, use_container_width=True)
-    with p2:
-        st.plotly_chart(fig_risk, use_container_width=True)
 
-    export_path = export_analysis(analyzed)
-    with open(export_path, "rb") as f:
+        st.plotly_chart(
+            fig_stage,
+            use_container_width=True
+        )
+
+    with p2:
+
+        st.plotly_chart(
+            fig_risk,
+            use_container_width=True
+        )
+
+    export_path = export_analysis(
+        analyzed
+    )
+
+    with open(
+        export_path,
+        "rb"
+    ) as f:
+
         st.download_button(
             "Download analyzed workbook",
             f.read(),
@@ -1027,80 +1902,129 @@ if view == "Priority Dashboard":
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 
-# -------------------------
-# Employee Detail
-# -------------------------
-elif view == "Employee Detail":
-    st.subheader("Employee Control Tower")
 
-    detail_index = _choice_index(choices, st.session_state.get("selected_employee_id"))
+# -----------------------------------------------------------------------------
+# EMPLOYEE DETAIL
+# -----------------------------------------------------------------------------
+
+elif view == "Employee Detail":
+
+    st.subheader(
+        "Employee Control Tower"
+    )
+
+    choices = _employee_choices(
+        analyzed
+    )
+
+    detail_index = _choice_index(
+        choices,
+        st.session_state.get(
+            "selected_employee_id"
+        )
+    )
+
     selected = st.selectbox(
         "Select employee",
         choices,
         index=detail_index,
         key="detail_emp",
         on_change=_sync_employee_from_widget,
-        args=("detail_emp",),
+        args=("detail_emp",)
     )
-    emp_id = selected.split(" — ",1)[0]
-    st.session_state["selected_employee_id"] = emp_id
-    row = analyzed[analyzed["Employee ID"].astype(str)==emp_id].iloc[0]
 
-    p = row["Priority"]
-    icon = {"Red":"🔴","Yellow":"🟡","Green":"🟢"}.get(p,"")
-    st.markdown(f"### {row['Employee Name']} — {row['Employee ID']}")
-    c1,c2,c3,c4 = st.columns(4)
-    c1.metric("Priority", f"{icon} {p}")
-    c2.metric("Days to Start", row["Days to Start"])
-    c3.metric("Stage", row["Current Stage"])
-    c4.metric("Risk", row["Risk Level"])
+    emp_id = selected.split(
+        " — ",
+        1
+    )[0]
 
-    st.markdown(f"**Primary blocker:** {row['Primary Bottleneck']}")
-    st.markdown(f"**Blocked downstream task:** {row['Blocked Downstream Task']}")
-    st.markdown(f"**Next action:** {row['Next Action']}")
-    st.markdown(f"**Owner:** {row['Responsible Party']}")
-    st.info(row["Control Tower Explanation"])
+    st.session_state[
+        "selected_employee_id"
+    ] = emp_id
 
-    checklist = pd.DataFrame(
-        [[c, _norm(row.get(c))] for c in CORE_CHECKLIST + ["SafeColleges"]] +
-        [
-            ["HRIS Employee ID", _norm(row.get("HRIS Employee ID"))],
-            ["Payroll Screens", _norm(row.get("Payroll Screens"))],
-            ["HR Notified IT", _norm(row.get("HR Notified IT"))],
-            ["IT Email/System Access", _norm(row.get("IT Email/System Access"))],
-        ],
-        columns=["Onboarding Item","Status"]
-    )
-    st.dataframe(checklist, use_container_width=True, hide_index=True)
+    selected_rows = analyzed[
+        analyzed["Employee ID"].astype(str)
+        == emp_id
+    ]
 
-    b1, b2 = st.columns([1, 3])
-    with b1:
-        if st.button("✉️ Draft follow-up email", type="primary", use_container_width=True):
-            st.session_state["requested_view"] = "Communications"
-            st.rerun()
-    with b2:
-        st.caption(
-            "The Communications page will open with this employee already selected."
+    if not selected_rows.empty:
+
+        row = selected_rows.iloc[0]
+
+        show_employee_detail(
+            row
         )
 
-# -------------------------
-# Communications
-# -------------------------
-elif view == "Communications":
-    st.subheader("Draft Follow-Up Email")
+        st.divider()
 
-    comm_index = _choice_index(choices, st.session_state.get("selected_employee_id"))
+        b1, b2 = st.columns(
+            [1, 3]
+        )
+
+        with b1:
+
+            if st.button(
+                "✉️ Draft follow-up email",
+                type="primary",
+                use_container_width=True
+            ):
+
+                st.session_state[
+                    "main_view"
+                ] = "Communications"
+
+                st.rerun()
+
+        with b2:
+
+            st.caption(
+                "The Communications page will open with this employee already selected."
+            )
+
+
+# -----------------------------------------------------------------------------
+# COMMUNICATIONS
+# -----------------------------------------------------------------------------
+
+elif view == "Communications":
+
+    st.subheader(
+        "Draft Follow-Up Email"
+    )
+
+    choices = _employee_choices(
+        analyzed
+    )
+
+    comm_index = _choice_index(
+        choices,
+        st.session_state.get(
+            "selected_employee_id"
+        )
+    )
+
     selected2 = st.selectbox(
         "Employee for communication",
         choices,
         index=comm_index,
         key="comm_emp",
         on_change=_sync_employee_from_widget,
-        args=("comm_emp",),
+        args=("comm_emp",)
     )
-    emp_id2 = selected2.split(" — ",1)[0]
-    st.session_state["selected_employee_id"] = emp_id2
-    row2 = analyzed[analyzed["Employee ID"].astype(str)==emp_id2].iloc[0]
+
+    emp_id2 = selected2.split(
+        " — ",
+        1
+    )[0]
+
+    st.session_state[
+        "selected_employee_id"
+    ] = emp_id2
+
+    row2 = analyzed[
+        analyzed["Employee ID"].astype(str)
+        == emp_id2
+    ].iloc[0]
 
     route = resolve_recipient(
         row2,
@@ -1111,17 +2035,34 @@ elif view == "Communications":
 
     st.caption(
         f"Suggested recipient role: {route['role']}. "
-        "Recipient comes from workflow ownership + contact data, not AI guessing."
+        "Recipient comes from workflow ownership + contact data, "
+        "not AI guessing."
     )
 
-    to_email = st.text_input("To", value=route["to"], key=f"to_{emp_id2}")
-    cc_email = st.text_input("CC", value=route["cc"], key=f"cc_{emp_id2}")
-    subject = st.text_input("Subject", value=suggested_subject(row2), key=f"subject_{emp_id2}")
+    to_email = st.text_input(
+        "To",
+        value=route["to"],
+        key=f"to_{emp_id2}"
+    )
+
+    cc_email = st.text_input(
+        "CC",
+        value=route["cc"],
+        key=f"cc_{emp_id2}"
+    )
+
+    subject = st.text_input(
+        "Subject",
+        value=suggested_subject(row2),
+        key=f"subject_{emp_id2}"
+    )
+
     body_default = deterministic_reminder(
         row2,
         sender_name=sender_name,
         recipient_role=route["role"]
     )
+
     body = st.text_area(
         "Email body",
         value=body_default,
@@ -1130,49 +2071,132 @@ elif view == "Communications":
     )
 
     if to_email:
-        params = {"view":"cm","fs":"1","to":to_email,"su":subject,"body":body}
+
+        params = {
+            "view": "cm",
+            "fs": "1",
+            "to": to_email,
+            "su": subject,
+            "body": body
+        }
+
         if cc_email:
+
             params["cc"] = cc_email
-        gmail_url = "https://mail.google.com/mail/?" + urllib.parse.urlencode(
-            params, quote_via=urllib.parse.quote
+
+        gmail_url = (
+            "https://mail.google.com/mail/?"
+            +
+            urllib.parse.urlencode(
+                params,
+                quote_via=urllib.parse.quote
+            )
         )
-        st.link_button("Open Draft in Gmail", gmail_url)
+
+        st.link_button(
+            "Open Draft in Gmail",
+            gmail_url
+        )
+
     else:
-        st.warning("No email address could be resolved. Confirm or enter the recipient manually.")
 
-    if st.button("Send Email (Demo)"):
-        st.success("Demo email logged as sent. No external email was transmitted.")
+        st.warning(
+            "No email address could be resolved. "
+            "Confirm or enter the recipient manually."
+        )
 
-# -------------------------
-# Rule Validation
-# -------------------------
+    if st.button(
+        "Send Email (Demo)"
+    ):
+
+        st.success(
+            "Demo email logged as sent. "
+            "No external email was transmitted."
+        )
+
+
+# -----------------------------------------------------------------------------
+# RULE VALIDATION
+# -----------------------------------------------------------------------------
+
 elif view == "Rule Validation":
-    st.subheader("Rule Validation")
-    md, val = validate_test_cases(analyzed, test_df)
+
+    st.subheader(
+        "Rule Validation"
+    )
+
+    md, val = validate_test_cases(
+        analyzed,
+        test_df
+    )
+
     st.markdown(md)
+
     if len(val):
-        st.dataframe(val, use_container_width=True, hide_index=True)
 
-# -------------------------
-# About
-# -------------------------
+        st.dataframe(
+            val,
+            use_container_width=True,
+            hide_index=True
+        )
+
+
+# -----------------------------------------------------------------------------
+# ABOUT
+# -----------------------------------------------------------------------------
+
 elif view == "About":
-    st.subheader("About the Prototype")
-    st.markdown("""
-**Core design**
-- HRIS readiness gate
-- payroll prerequisite gate
-- SafeColleges / IT access gate
-- downstream blocking
-- human ownership / next action
-- urgency prioritization
-- role-based reminder drafting
 
-**Live Google Sheet**
-If the fictional Sheet is updated, Streamlit reloads the data on page rerun.
-No Excel re-upload is required.
+    st.subheader(
+        "About the Prototype"
+    )
 
-**Prototype boundary**
-Use fictional/demo data in the classroom app. Do not publish real employee HR data
-in a public Streamlit app.
-""")
+    st.markdown(
+        """
+        **AI Onboarding Control Tower**
+
+        This classroom prototype helps HR monitor the employee
+        onboarding process from accepted offer through operational readiness.
+
+        ### Core Functions
+
+        - Search employees by Employee ID
+        - Search employees by Employee Name
+        - Search employees by Department
+        - View employee department and start date
+        - Identify missing onboarding checklist items
+        - Calculate Core Checklist %
+        - Determine whether the Core Checklist is ready
+        - Identify onboarding risk
+        - Identify workflow bottlenecks
+        - Identify the responsible party
+        - Show the next required action
+        - Prioritize employees by risk and urgency
+        - Draft follow-up communication
+
+        ### Onboarding Checklist
+
+        The prototype monitors:
+
+        - Employee Info Form
+        - Federal W-4
+        - Iowa W-4
+        - Direct Deposit
+        - I-9
+        - I-9 Supporting Docs
+        - Property Agreement
+        - Internet Use Policy
+        - Payroll Authorization
+        - Email/Computer Request
+        - Handbook Ack
+        - SafeColleges
+
+        ### Prototype Boundary
+
+        This application is designed for classroom demonstration
+        using fictional/mock employee data.
+
+        Do not publish real employee HR information in a public
+        Streamlit application.
+        """
+    )
