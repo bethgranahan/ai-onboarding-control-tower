@@ -990,8 +990,9 @@ def read_public_google_sheet(
 
 st.set_page_config(
     page_title="AI Onboarding Control Tower",
-    page_icon="🧭",
-    layout="wide"
+    page_icon="◈",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
 
@@ -999,82 +1000,593 @@ st.set_page_config(
 # SESSION STATE
 # -----------------------------------------------------------------------------
 
-if "main_view" not in st.session_state:
+DEFAULT_SESSION = {
+    "authenticated": False,
+    "main_view": "Overview",
+    "selected_employee_id": None,
+    "google_sheet_url": "",
+    "google_sheet_loaded": False,
+    "google_sheet_last_refresh": None,
+    "login_attempted": False,
+}
 
-    st.session_state["main_view"] = "Home"
+for key, value in DEFAULT_SESSION.items():
 
+    if key not in st.session_state:
 
-if "selected_employee_id" not in st.session_state:
-
-    st.session_state[
-        "selected_employee_id"
-    ] = None
-
-
-if "google_sheet_url" not in st.session_state:
-
-    st.session_state[
-        "google_sheet_url"
-    ] = ""
-
-
-if "google_sheet_loaded" not in st.session_state:
-
-    st.session_state[
-        "google_sheet_loaded"
-    ] = False
+        st.session_state[key] = value
 
 
 # -----------------------------------------------------------------------------
-# CUSTOM HOME STYLING
+# DEMO LOGIN
+# -----------------------------------------------------------------------------
+
+DEMO_USERNAME = "HR.Admin"
+DEMO_PASSWORD = "HR2026"
+
+
+# -----------------------------------------------------------------------------
+# PROFESSIONAL UI STYLING
 # -----------------------------------------------------------------------------
 
 st.markdown(
     """
     <style>
 
-    .home-title {
-        text-align: center;
-        font-size: 42px;
-        font-weight: 800;
+    /* =========================================================
+       GLOBAL
+       ========================================================= */
+
+    .stApp {
+        background: #F6F7F9;
+    }
+
+    .main .block-container {
+        padding-top: 1.5rem;
+        padding-bottom: 3rem;
+        max-width: 1500px;
+    }
+
+    h1, h2, h3 {
         color: #111111;
-        margin-top: 35px;
-        margin-bottom: 10px;
+        letter-spacing: -0.02em;
     }
 
-    .home-subtitle {
-        text-align: center;
+    p {
         color: #555555;
-        font-size: 18px;
-        margin-bottom: 35px;
     }
 
-    .home-card {
-        border: 2px solid #111111;
-        border-radius: 18px;
-        padding: 28px;
-        min-height: 220px;
-        text-align: center;
-        box-shadow: 4px 4px 0px #111111;
-        margin-bottom: 12px;
+
+    /* =========================================================
+       SIDEBAR
+       ========================================================= */
+
+    section[data-testid="stSidebar"] {
+        background: #111111;
+        border-right: 1px solid #242424;
     }
 
-    .home-card-yellow {
-        background-color: #F4C542;
+    section[data-testid="stSidebar"] * {
+        color: #F5F5F5;
     }
 
-    .home-card-black {
-        background-color: #111111;
-        color: white;
+    section[data-testid="stSidebar"] .stRadio label {
+        color: #D7D7D7;
     }
 
-    .home-card h2 {
+    section[data-testid="stSidebar"] .stRadio label:hover {
+        color: #F4C542;
+    }
+
+    .sidebar-brand {
+        padding: 10px 5px 25px 5px;
+    }
+
+    .sidebar-brand-title {
+        font-size: 19px;
+        font-weight: 800;
+        color: #FFFFFF;
+        letter-spacing: 0.04em;
+    }
+
+    .sidebar-brand-accent {
+        color: #F4C542;
+    }
+
+    .sidebar-brand-subtitle {
+        font-size: 11px;
+        color: #8E8E8E;
+        margin-top: 5px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .sidebar-user {
+        background: #1B1B1B;
+        border: 1px solid #303030;
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 20px;
         margin-bottom: 15px;
     }
 
-    .home-card p {
+    .sidebar-user-name {
+        font-weight: 700;
+        font-size: 14px;
+        color: #FFFFFF;
+    }
+
+    .sidebar-user-role {
+        font-size: 11px;
+        color: #999999;
+        margin-top: 3px;
+    }
+
+
+    /* =========================================================
+       TOP HEADER
+       ========================================================= */
+
+    .top-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 16px;
+        padding: 18px 22px;
+        margin-bottom: 24px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    }
+
+    .top-header-title {
+        font-size: 23px;
+        font-weight: 800;
+        color: #111111;
+    }
+
+    .top-header-subtitle {
+        color: #777777;
+        font-size: 13px;
+        margin-top: 3px;
+    }
+
+    .top-header-user {
+        text-align: right;
+    }
+
+    .top-header-user-name {
+        font-size: 13px;
+        font-weight: 700;
+        color: #222222;
+    }
+
+    .top-header-user-role {
+        font-size: 11px;
+        color: #888888;
+    }
+
+
+    /* =========================================================
+       LOGIN
+       ========================================================= */
+
+    .login-page {
+        min-height: 82vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 22px;
+        padding: 42px;
+        box-shadow: 0 18px 55px rgba(0,0,0,0.10);
+    }
+
+    .login-logo {
+        width: 54px;
+        height: 54px;
+        border-radius: 14px;
+        background: #111111;
+        color: #F4C542;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 27px;
+        font-weight: 800;
+        margin-bottom: 20px;
+    }
+
+    .login-title {
+        font-size: 31px;
+        font-weight: 850;
+        color: #111111;
+        margin-bottom: 5px;
+    }
+
+    .login-subtitle {
+        color: #777777;
+        font-size: 14px;
+        margin-bottom: 28px;
+    }
+
+    .login-footer {
+        color: #999999;
+        font-size: 11px;
+        text-align: center;
+        margin-top: 18px;
+    }
+
+
+    /* =========================================================
+       HERO
+       ========================================================= */
+
+    .hero {
+        background: #111111;
+        border-radius: 20px;
+        padding: 30px 34px;
+        color: white;
+        margin-bottom: 25px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .hero:after {
+        content: "";
+        position: absolute;
+        right: -60px;
+        top: -100px;
+        width: 250px;
+        height: 250px;
+        border-radius: 50%;
+        border: 45px solid #F4C542;
+        opacity: 0.12;
+    }
+
+    .hero-eyebrow {
+        color: #F4C542;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        margin-bottom: 7px;
+    }
+
+    .hero-title {
+        font-size: 31px;
+        font-weight: 850;
+        color: #FFFFFF;
+        margin-bottom: 7px;
+    }
+
+    .hero-text {
+        color: #BDBDBD;
+        font-size: 14px;
+        max-width: 680px;
+    }
+
+
+    /* =========================================================
+       KPI CARDS
+       ========================================================= */
+
+    .kpi-card {
+        background: #FFFFFF;
+        border: 1px solid #E4E7EB;
+        border-radius: 16px;
+        padding: 20px;
+        min-height: 125px;
+        box-shadow: 0 2px 9px rgba(0,0,0,0.025);
+    }
+
+    .kpi-label {
+        color: #777777;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+    }
+
+    .kpi-value {
+        color: #111111;
+        font-size: 32px;
+        font-weight: 850;
+        margin-top: 8px;
+    }
+
+    .kpi-description {
+        color: #999999;
+        font-size: 11px;
+        margin-top: 3px;
+    }
+
+    .kpi-yellow {
+        border-top: 4px solid #F4C542;
+    }
+
+    .kpi-red {
+        border-top: 4px solid #D64545;
+    }
+
+    .kpi-green {
+        border-top: 4px solid #3A9B6B;
+    }
+
+    .kpi-blue {
+        border-top: 4px solid #4D73BE;
+    }
+
+
+    /* =========================================================
+       SECTION HEADERS
+       ========================================================= */
+
+    .section-title {
+        font-size: 19px;
+        font-weight: 800;
+        color: #111111;
+        margin-top: 28px;
+        margin-bottom: 4px;
+    }
+
+    .section-subtitle {
+        font-size: 13px;
+        color: #888888;
+        margin-bottom: 15px;
+    }
+
+
+    /* =========================================================
+       INSIGHT CARDS
+       ========================================================= */
+
+    .insight-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 15px;
+        padding: 18px;
+        min-height: 145px;
+    }
+
+    .insight-label {
+        font-size: 11px;
+        color: #8A8A8A;
+        text-transform: uppercase;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+    }
+
+    .insight-value {
+        font-size: 17px;
+        color: #111111;
+        font-weight: 750;
+        margin-top: 8px;
+        line-height: 1.35;
+    }
+
+    .insight-small {
+        font-size: 12px;
+        color: #888888;
+        margin-top: 7px;
+    }
+
+
+    /* =========================================================
+       EMPLOYEE CARDS
+       ========================================================= */
+
+    .employee-card {
+        background: #FFFFFF;
+        border: 1px solid #E4E7EB;
+        border-radius: 16px;
+        padding: 19px;
+        margin-bottom: 10px;
+    }
+
+    .employee-name {
+        font-size: 17px;
+        font-weight: 800;
+        color: #111111;
+    }
+
+    .employee-meta {
+        font-size: 12px;
+        color: #888888;
+        margin-top: 3px;
+    }
+
+    .status-badge {
+        display: inline-block;
+        border-radius: 20px;
+        padding: 5px 10px;
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .badge-green {
+        background: #E8F5EE;
+        color: #287A50;
+    }
+
+    .badge-yellow {
+        background: #FFF5CF;
+        color: #866A00;
+    }
+
+    .badge-red {
+        background: #FBE9E9;
+        color: #A62E2E;
+    }
+
+
+    /* =========================================================
+       PROFILE
+       ========================================================= */
+
+    .profile-header {
+        background: #FFFFFF;
+        border: 1px solid #E4E7EB;
+        border-radius: 18px;
+        padding: 24px;
+        margin-bottom: 18px;
+    }
+
+    .profile-avatar {
+        width: 58px;
+        height: 58px;
+        border-radius: 16px;
+        background: #111111;
+        color: #F4C542;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 23px;
+        font-weight: 850;
+    }
+
+    .profile-name {
+        font-size: 25px;
+        font-weight: 850;
+        color: #111111;
+    }
+
+    .profile-meta {
+        color: #777777;
+        font-size: 13px;
+        margin-top: 3px;
+    }
+
+
+    /* =========================================================
+       DATA SOURCE
+       ========================================================= */
+
+    .data-status {
+        background: #FFFFFF;
+        border: 1px solid #E4E7EB;
+        border-radius: 14px;
+        padding: 15px;
+        margin-top: 8px;
+        margin-bottom: 18px;
+    }
+
+    .data-status-title {
+        font-weight: 750;
+        color: #222222;
+        font-size: 13px;
+    }
+
+    .data-status-text {
+        color: #777777;
+        font-size: 11px;
+        margin-top: 3px;
+    }
+
+
+    /* =========================================================
+       NAV BUTTONS
+       ========================================================= */
+
+    .nav-card {
+        background: #FFFFFF;
+        border: 1px solid #E5E7EB;
+        border-radius: 15px;
+        padding: 19px;
+        min-height: 130px;
+    }
+
+    .nav-card-title {
+        font-weight: 800;
         font-size: 16px;
-        line-height: 1.5;
+        color: #111111;
+    }
+
+    .nav-card-text {
+        color: #777777;
+        font-size: 12px;
+        margin-top: 6px;
+        line-height: 1.45;
+    }
+
+
+    /* =========================================================
+       TABLE
+       ========================================================= */
+
+    [data-testid="stDataFrame"] {
+        border-radius: 12px;
+    }
+
+
+    /* =========================================================
+       BUTTONS
+       ========================================================= */
+
+    .stButton > button,
+    .stLinkButton > a {
+        border-radius: 9px !important;
+        font-weight: 700 !important;
+        border: 1px solid #D8D8D8 !important;
+        min-height: 40px !important;
+    }
+
+    .stButton > button[kind="primary"] {
+        background: #111111 !important;
+        color: #FFFFFF !important;
+        border-color: #111111 !important;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        background: #F4C542 !important;
+        color: #111111 !important;
+        border-color: #F4C542 !important;
+    }
+
+
+    /* =========================================================
+       PROGRESS
+       ========================================================= */
+
+    .progress-container {
+        background: #E9EAEC;
+        height: 9px;
+        border-radius: 20px;
+        overflow: hidden;
+        margin-top: 9px;
+        margin-bottom: 7px;
+    }
+
+    .progress-bar {
+        background: #F4C542;
+        height: 100%;
+        border-radius: 20px;
+    }
+
+    .progress-label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #777777;
+    }
+
+
+    /* =========================================================
+       FOOTER
+       ========================================================= */
+
+    .app-footer {
+        border-top: 1px solid #E4E7EB;
+        margin-top: 45px;
+        padding-top: 15px;
+        color: #999999;
+        font-size: 10px;
+        text-align: center;
     }
 
     </style>
@@ -1084,44 +1596,284 @@ st.markdown(
 
 
 # -----------------------------------------------------------------------------
+# LOGIN PAGE
+# -----------------------------------------------------------------------------
+
+def show_login():
+
+    st.markdown(
+        "<div class='login-page'>",
+        unsafe_allow_html=True
+    )
+
+    left, center, right = st.columns(
+        [1, 1.15, 1]
+    )
+
+    with center:
+
+        st.markdown(
+            """
+            <div class="login-card">
+
+                <div class="login-logo">◈</div>
+
+                <div class="login-title">
+                    Welcome back
+                </div>
+
+                <div class="login-subtitle">
+                    Sign in to the AI Onboarding Control Tower
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        username = st.text_input(
+            "Username",
+            placeholder="Enter your HR username",
+            key="login_username"
+        )
+
+        password = st.text_input(
+            "Password",
+            type="password",
+            placeholder="Enter your password",
+            key="login_password"
+        )
+
+        remember = st.checkbox(
+            "Remember this session"
+        )
+
+        if st.button(
+            "Sign in",
+            type="primary",
+            use_container_width=True
+        ):
+
+            st.session_state[
+                "login_attempted"
+            ] = True
+
+            if (
+                username.strip()
+                == DEMO_USERNAME
+                and password
+                == DEMO_PASSWORD
+            ):
+
+                st.session_state[
+                    "authenticated"
+                ] = True
+
+                st.session_state[
+                    "main_view"
+                ] = "Overview"
+
+                st.rerun()
+
+            else:
+
+                st.error(
+                    "Invalid username or password."
+                )
+
+        st.markdown(
+            """
+            <div class="login-footer">
+                Internal HR workspace · Classroom prototype
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        "</div>",
+        unsafe_allow_html=True
+    )
+
+
+# -----------------------------------------------------------------------------
+# STOP HERE IF NOT AUTHENTICATED
+# -----------------------------------------------------------------------------
+
+if not st.session_state["authenticated"]:
+
+    show_login()
+    st.stop()
+
+
+# -----------------------------------------------------------------------------
 # SIDEBAR
 # -----------------------------------------------------------------------------
 
 with st.sidebar:
 
-    st.header("Session Settings")
+    st.markdown(
+        """
+        <div class="sidebar-brand">
 
-    sender_name = st.text_input(
-        "Current HR user name",
-        "Demo HR Coordinator"
+            <div class="sidebar-brand-title">
+                AI ONBOARDING
+                <span class="sidebar-brand-accent">
+                    CONTROL TOWER
+                </span>
+            </div>
+
+            <div class="sidebar-brand-subtitle">
+                HR Operations Platform
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    sender_email = st.text_input(
-        "Current HR user email",
-        "hr.onboarding@example.com"
+    st.markdown(
+        """
+        <div style="
+            color:#777777;
+            font-size:10px;
+            font-weight:800;
+            letter-spacing:.10em;
+            margin-bottom:8px;
+        ">
+            WORKSPACE
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    default_it_email = st.text_input(
-        "Default IT contact email",
-        "it.access@example.com"
+    NAV_OPTIONS = [
+        "Overview",
+        "Employee Directory",
+        "Risk Monitor",
+        "Analytics",
+        "Communications",
+        "Rule Validation",
+        "Data Management",
+        "About",
+    ]
+
+    nav_icons = {
+        "Overview": "⌂",
+        "Employee Directory": "♙",
+        "Risk Monitor": "!",
+        "Analytics": "◫",
+        "Communications": "✉",
+        "Rule Validation": "✓",
+        "Data Management": "↻",
+        "About": "i",
+    }
+
+    current_view = st.session_state["main_view"]
+
+    if current_view not in NAV_OPTIONS:
+
+        current_view = "Overview"
+
+    selected_view = st.radio(
+        "Navigation",
+        NAV_OPTIONS,
+        index=NAV_OPTIONS.index(current_view),
+        format_func=lambda x: (
+            f"{nav_icons.get(x, '')}   {x}"
+        ),
+        key="sidebar_navigation",
+        label_visibility="collapsed"
     )
 
-    as_of_text = st.date_input(
-        "As-of date",
-        value=date.today()
-    ).isoformat()
+    st.session_state[
+        "main_view"
+    ] = selected_view
 
     st.divider()
 
-    st.subheader("Data Source")
-
-    source_type = st.radio(
-        "Choose source",
-        [
-            "Excel upload",
-            "Live Google Sheet"
-        ]
+    st.markdown(
+        """
+        <div style="
+            color:#777777;
+            font-size:10px;
+            font-weight:800;
+            letter-spacing:.10em;
+            margin-bottom:8px;
+        ">
+            ACCOUNT
+        </div>
+        """,
+        unsafe_allow_html=True
     )
+
+    st.markdown(
+        """
+        <div class="sidebar-user">
+
+            <div class="sidebar-user-name">
+                HR Admin
+            </div>
+
+            <div class="sidebar-user-role">
+                HR Administrator
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    if st.button(
+        "Sign out",
+        use_container_width=True
+    ):
+
+        st.session_state[
+            "authenticated"
+        ] = False
+
+        st.session_state[
+            "main_view"
+        ] = "Overview"
+
+        st.rerun()
+
+
+# -----------------------------------------------------------------------------
+# TOP HEADER
+# -----------------------------------------------------------------------------
+
+st.markdown(
+    """
+    <div class="top-header">
+
+        <div>
+            <div class="top-header-title">
+                AI Onboarding Control Tower
+            </div>
+
+            <div class="top-header-subtitle">
+                Employee lifecycle visibility and onboarding workflow intelligence
+            </div>
+        </div>
+
+        <div class="top-header-user">
+
+            <div class="top-header-user-name">
+                HR Admin
+            </div>
+
+            <div class="top-header-user-role">
+                HR Administrator
+            </div>
+
+        </div>
+
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
 
 # -----------------------------------------------------------------------------
@@ -1135,361 +1887,370 @@ source_label = ""
 
 
 # -----------------------------------------------------------------------------
-# EXCEL UPLOAD
+# DATA SOURCE PAGE / LOADER
 # -----------------------------------------------------------------------------
 
-if source_type == "Excel upload":
+def load_excel(uploaded_file):
 
-    uploaded = st.file_uploader(
-        "Upload onboarding Excel workbook",
-        type=["xlsx", "xls"]
+    xls = pd.ExcelFile(
+        uploaded_file
     )
 
-    if uploaded is not None:
-
-        try:
-
-            xls = pd.ExcelFile(
-                uploaded
-            )
-
-            emp_sheet = (
-                "Employee_Data"
-                if "Employee_Data"
-                in xls.sheet_names
-                else xls.sheet_names[0]
-            )
-
-            raw_df = pd.read_excel(
-                uploaded,
-                sheet_name=emp_sheet
-            )
-
-            if "Test_Cases" in xls.sheet_names:
-
-                test_df = pd.read_excel(
-                    uploaded,
-                    sheet_name="Test_Cases"
-                )
-
-            if "Contact_Directory" in xls.sheet_names:
-
-                contact_df = pd.read_excel(
-                    uploaded,
-                    sheet_name="Contact_Directory"
-                )
-
-            source_label = (
-                f"Excel: {uploaded.name}"
-            )
-
-        except Exception as e:
-
-            st.error(
-                f"Could not read workbook: {e}"
-            )
-
-
-# -----------------------------------------------------------------------------
-# GOOGLE SHEETS
-# -----------------------------------------------------------------------------
-
-else:
-
-    st.markdown(
-        "### 🔗 Live Google Sheet"
+    emp_sheet = (
+        "Employee_Data"
+        if "Employee_Data"
+        in xls.sheet_names
+        else xls.sheet_names[0]
     )
 
-    st.caption(
-        "HR can update the Google Sheet directly. "
-        "Click Refresh Data after making changes."
+    employees = pd.read_excel(
+        uploaded_file,
+        sheet_name=emp_sheet
     )
 
-    sheet_url = st.text_input(
-        "Google Sheet URL",
-        value=st.session_state[
-            "google_sheet_url"
-        ],
-        placeholder=(
-            "https://docs.google.com/spreadsheets/d/..."
-        )
-    )
+    tests = pd.DataFrame()
+    contacts = pd.DataFrame()
 
-    if sheet_url:
+    if "Test_Cases" in xls.sheet_names:
 
-        st.session_state[
-            "google_sheet_url"
-        ] = sheet_url
-
-    refresh = st.button(
-        "🔄 Refresh Data",
-        type="primary",
-        use_container_width=True
-    )
-
-    # Automatically load once when URL is first entered
-    should_load = (
-        bool(sheet_url)
-        and (
-            refresh
-            or not st.session_state[
-                "google_sheet_loaded"
-            ]
-        )
-    )
-
-    if should_load:
-
-        try:
-
-            with st.spinner(
-                "Refreshing onboarding data..."
-            ):
-
-                raw_df = read_public_google_sheet(
-                    sheet_url,
-                    "Employee_Data"
-                )
-
-                try:
-
-                    test_df = read_public_google_sheet(
-                        sheet_url,
-                        "Test_Cases"
-                    )
-
-                except Exception:
-
-                    test_df = pd.DataFrame()
-
-                try:
-
-                    contact_df = read_public_google_sheet(
-                        sheet_url,
-                        "Contact_Directory"
-                    )
-
-                except Exception:
-
-                    contact_df = pd.DataFrame()
-
-            st.session_state[
-                "google_sheet_loaded"
-            ] = True
-
-            st.session_state[
-                "google_sheet_last_refresh"
-            ] = datetime.now().strftime(
-                "%m/%d/%Y %I:%M:%S %p"
-            )
-
-            source_label = (
-                "Live Google Sheet"
-            )
-
-            st.success(
-                "Data refreshed successfully."
-            )
-
-        except Exception as e:
-
-            st.session_state[
-                "google_sheet_loaded"
-            ] = False
-
-            st.error(
-                str(e)
-            )
-
-    elif (
-        st.session_state[
-            "google_sheet_loaded"
-        ]
-        and sheet_url
-    ):
-
-        # Load the existing URL even after navigation
-        try:
-
-            raw_df = read_public_google_sheet(
-                sheet_url,
-                "Employee_Data"
-            )
-
-            try:
-
-                test_df = read_public_google_sheet(
-                    sheet_url,
-                    "Test_Cases"
-                )
-
-            except Exception:
-
-                test_df = pd.DataFrame()
-
-            try:
-
-                contact_df = read_public_google_sheet(
-                    sheet_url,
-                    "Contact_Directory"
-                )
-
-            except Exception:
-
-                contact_df = pd.DataFrame()
-
-            source_label = (
-                "Live Google Sheet"
-            )
-
-        except Exception as e:
-
-            st.error(
-                f"Could not load Google Sheet: {e}"
-            )
-
-    if (
-        st.session_state.get(
-            "google_sheet_last_refresh"
-        )
-    ):
-
-        st.caption(
-            "Last refresh: "
-            + st.session_state[
-                "google_sheet_last_refresh"
-            ]
+        tests = pd.read_excel(
+            uploaded_file,
+            sheet_name="Test_Cases"
         )
 
+    if "Contact_Directory" in xls.sheet_names:
+
+        contacts = pd.read_excel(
+            uploaded_file,
+            sheet_name="Contact_Directory"
+        )
+
+    return employees, tests, contacts
+
+
+def load_google_data(sheet_url):
+
+    employees = read_public_google_sheet(
+        sheet_url,
+        "Employee_Data"
+    )
+
+    try:
+
+        tests = read_public_google_sheet(
+            sheet_url,
+            "Test_Cases"
+        )
+
+    except Exception:
+
+        tests = pd.DataFrame()
+
+    try:
+
+        contacts = read_public_google_sheet(
+            sheet_url,
+            "Contact_Directory"
+        )
+
+    except Exception:
+
+        contacts = pd.DataFrame()
+
+    return employees, tests, contacts
+
 
 # -----------------------------------------------------------------------------
-# HOME PAGE FUNCTION
+# DATA MANAGEMENT PAGE
 # -----------------------------------------------------------------------------
 
-def show_home():
+def show_data_management():
 
     st.markdown(
         """
-        <div class="home-title">
-            Welcome to the AI Onboarding Control Tower
+        <div class="section-title">
+            Data Management
         </div>
 
-        <div class="home-subtitle">
-            Monitor onboarding progress, identify actions needed,
-            and quickly search employee status.
+        <div class="section-subtitle">
+            Manage the employee data that powers the Control Tower.
         </div>
         """,
         unsafe_allow_html=True
     )
 
-    c1, c2, c3 = st.columns(
-        3,
-        gap="large"
-    )
-
-    # ---------------------------------------------------------
-    # ONBOARDING STATUS
-    # ---------------------------------------------------------
-
-    with c1:
-
-        st.markdown(
-            """
-            <div class="home-card home-card-yellow">
-                <h2>📋 Onboarding Status</h2>
-                <p>
-                    View an employee's onboarding progress,
-                    checklist, current stage, risk level,
-                    and readiness.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        if st.button(
-            "Open Onboarding Status",
-            use_container_width=True,
-            key="home_status"
-        ):
-
-            st.session_state[
-                "main_view"
-            ] = "Employee Detail"
-
-            st.rerun()
-
-    # ---------------------------------------------------------
-    # ACTION NEEDED
-    # ---------------------------------------------------------
-
-    with c2:
-
-        st.markdown(
-            """
-            <div class="home-card home-card-black">
-                <h2>⚠️ Action Needed</h2>
-                <p>
-                    See which employees need attention,
-                    identify workflow bottlenecks,
-                    and prioritize follow-up actions.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        if st.button(
-            "Open Action Needed",
-            use_container_width=True,
-            key="home_action"
-        ):
-
-            st.session_state[
-                "main_view"
-            ] = "Priority Dashboard"
-
-            st.rerun()
-
-    # ---------------------------------------------------------
-    # SEARCH
-    # ---------------------------------------------------------
-
-    with c3:
-
-        st.markdown(
-            """
-            <div class="home-card home-card-yellow">
-                <h2>🔎 Search</h2>
-                <p>
-                    Search employees by Employee ID,
-                    Employee Name, or Department.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        if st.button(
-            "Search Employee",
-            use_container_width=True,
-            key="home_search"
-        ):
-
-            st.session_state[
-                "main_view"
-            ] = "Search Employee"
-
-            st.rerun()
-
     st.markdown(
-        "<br>",
+        """
+        <div class="data-status">
+
+            <div class="data-status-title">
+                ◉ Data connection
+            </div>
+
+            <div class="data-status-text">
+                Connect an Excel workbook for a snapshot or a Google Sheet
+                for continuously updateable demo data.
+            </div>
+
+        </div>
+        """,
         unsafe_allow_html=True
     )
 
-    st.caption(
-        "Group 6 classroom prototype — fictional/mock employee data only"
+    source = st.radio(
+        "Choose data source",
+        [
+            "Excel upload",
+            "Live Google Sheet"
+        ],
+        horizontal=True
     )
+
+    if source == "Excel upload":
+
+        st.markdown(
+            "### Upload employee data"
+        )
+
+        uploaded = st.file_uploader(
+            "Choose Excel workbook",
+            type=["xlsx", "xls"],
+            key="professional_excel_upload"
+        )
+
+        st.caption(
+            "Expected worksheets: Employee_Data, Test_Cases, Contact_Directory."
+        )
+
+        if uploaded is not None:
+
+            try:
+
+                employees, tests, contacts = load_excel(
+                    uploaded
+                )
+
+                st.session_state[
+                    "uploaded_employees"
+                ] = employees
+
+                st.session_state[
+                    "uploaded_tests"
+                ] = tests
+
+                st.session_state[
+                    "uploaded_contacts"
+                ] = contacts
+
+                st.success(
+                    f"{len(employees)} employee records loaded from {uploaded.name}."
+                )
+
+            except Exception as e:
+
+                st.error(
+                    f"Could not read workbook: {e}"
+                )
+
+    else:
+
+        st.markdown(
+            "### Connect a live Google Sheet"
+        )
+
+        st.info(
+            "For the classroom prototype, the Google Sheet must be shared "
+            "as 'Anyone with the link — Viewer'."
+        )
+
+        sheet_url = st.text_input(
+            "Google Sheet URL",
+            value=st.session_state[
+                "google_sheet_url"
+            ],
+            placeholder="Paste your Google Sheets URL here"
+        )
+
+        if sheet_url:
+
+            st.session_state[
+                "google_sheet_url"
+            ] = sheet_url
+
+        if st.button(
+            "↻ Refresh live data",
+            type="primary",
+            use_container_width=False
+        ):
+
+            if not sheet_url.strip():
+
+                st.warning(
+                    "Please enter a Google Sheet URL first."
+                )
+
+            else:
+
+                try:
+
+                    with st.spinner(
+                        "Refreshing employee data..."
+                    ):
+
+                        employees, tests, contacts = (
+                            load_google_data(
+                                sheet_url
+                            )
+                        )
+
+                    st.session_state[
+                        "google_employees"
+                    ] = employees
+
+                    st.session_state[
+                        "google_tests"
+                    ] = tests
+
+                    st.session_state[
+                        "google_contacts"
+                    ] = contacts
+
+                    st.session_state[
+                        "google_sheet_loaded"
+                    ] = True
+
+                    st.session_state[
+                        "google_sheet_last_refresh"
+                    ] = datetime.now().strftime(
+                        "%m/%d/%Y %I:%M:%S %p"
+                    )
+
+                    st.success(
+                        f"Live data refreshed — {len(employees)} employees loaded."
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Could not load Google Sheet: {e}"
+                    )
+
+        if st.session_state.get(
+            "google_sheet_last_refresh"
+        ):
+
+            st.caption(
+                "Last refreshed: "
+                + st.session_state[
+                    "google_sheet_last_refresh"
+                ]
+            )
+
+    st.divider()
+
+    st.markdown(
+        "### Data source guide"
+    )
+
+    g1, g2 = st.columns(2)
+
+    with g1:
+
+        st.markdown(
+            """
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Excel
+                </div>
+
+                <div class="insight-value">
+                    Snapshot upload
+                </div>
+
+                <div class="insight-small">
+                    Upload a new workbook whenever HR wants
+                    to replace the current data.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with g2:
+
+        st.markdown(
+            """
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Google Sheets
+                </div>
+
+                <div class="insight-value">
+                    Updateable source
+                </div>
+
+                <div class="insight-small">
+                    HR can edit the connected Sheet and refresh
+                    the Control Tower to pull the latest values.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
+# -----------------------------------------------------------------------------
+# LOAD STORED DATA
+# -----------------------------------------------------------------------------
+
+if "google_employees" in st.session_state:
+
+    raw_df = st.session_state[
+        "google_employees"
+    ]
+
+    test_df = st.session_state.get(
+        "google_tests",
+        pd.DataFrame()
+    )
+
+    contact_df = st.session_state.get(
+        "google_contacts",
+        pd.DataFrame()
+    )
+
+    source_label = "Live Google Sheet"
+
+elif "uploaded_employees" in st.session_state:
+
+    raw_df = st.session_state[
+        "uploaded_employees"
+    ]
+
+    test_df = st.session_state.get(
+        "uploaded_tests",
+        pd.DataFrame()
+    )
+
+    contact_df = st.session_state.get(
+        "uploaded_contacts",
+        pd.DataFrame()
+    )
+
+    source_label = "Excel Upload"
+
+
+# -----------------------------------------------------------------------------
+# DATA MANAGEMENT CAN BE USED WITHOUT DATA
+# -----------------------------------------------------------------------------
+
+if st.session_state["main_view"] == "Data Management":
+
+    show_data_management()
 
 
 # -----------------------------------------------------------------------------
@@ -1498,22 +2259,33 @@ def show_home():
 
 if raw_df is None:
 
-    # Keep the homepage clean even before data is loaded.
-    if st.session_state["main_view"] == "Home":
+    if st.session_state["main_view"] != "Data Management":
 
-        show_home()
+        st.markdown(
+            """
+            <div class="hero">
 
-    else:
+                <div class="hero-eyebrow">
+                    Control Tower
+                </div>
 
-        st.warning(
-            "Please upload the onboarding Excel workbook "
-            "or connect a Google Sheet to open this section."
+                <div class="hero-title">
+                    Connect your onboarding data
+                </div>
+
+                <div class="hero-text">
+                    Upload the HR onboarding workbook or connect a
+                    Google Sheet to activate employee tracking,
+                    risk monitoring, and workflow analytics.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
         st.info(
-            "Use the Data Source section in the sidebar. "
-            "For Google Sheets, make sure the Sheet is shared "
-            "as 'Anyone with the link — Viewer'."
+            "Open Data Management from the sidebar to connect your employee data."
         )
 
     st.stop()
@@ -1538,6 +2310,37 @@ if missing:
 
 
 # -----------------------------------------------------------------------------
+# AS-OF DATE
+# -----------------------------------------------------------------------------
+
+with st.sidebar:
+
+    st.markdown(
+        """
+        <div style="
+            color:#777777;
+            font-size:10px;
+            font-weight:800;
+            letter-spacing:.10em;
+            margin-top:10px;
+            margin-bottom:7px;
+        ">
+            CONTROL DATE
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    as_of_date = st.date_input(
+        "As-of date",
+        value=date.today(),
+        label_visibility="collapsed"
+    )
+
+    as_of_text = as_of_date.isoformat()
+
+
+# -----------------------------------------------------------------------------
 # ANALYZE DATA
 # -----------------------------------------------------------------------------
 
@@ -1548,8 +2351,6 @@ analyzed = prioritize_df(
     )
 )
 
-
-# Employee ID as text
 analyzed["Employee ID"] = (
     analyzed["Employee ID"]
     .astype(str)
@@ -1557,7 +2358,6 @@ analyzed["Employee ID"] = (
 )
 
 
-# Set first employee if needed
 if (
     st.session_state[
         "selected_employee_id"
@@ -1575,44 +2375,56 @@ if (
 
 
 # -----------------------------------------------------------------------------
-# NAVIGATION
+# GLOBAL METRICS
 # -----------------------------------------------------------------------------
 
-NAV_OPTIONS = [
-    "Home",
-    "Search Employee",
-    "Employee Statistics",
-    "Priority Dashboard",
-    "Employee Detail",
-    "Communications",
-    "Rule Validation",
-    "About",
-]
+total_employees = len(analyzed)
 
+ready_count = int(
+    (
+        analyzed["Risk Level"]
+        == "Complete"
+    ).sum()
+)
 
-# Home should remain visually clean.
-# Navigation appears only after the user opens another section.
+critical_count = int(
+    (
+        analyzed["Risk Level"]
+        == "Critical"
+    ).sum()
+)
 
-if st.session_state["main_view"] != "Home":
+high_count = int(
+    (
+        analyzed["Risk Level"]
+        == "High"
+    ).sum()
+)
 
-    view = st.radio(
-        "Navigation",
-        NAV_OPTIONS,
-        key="main_view",
-        horizontal=True,
-        label_visibility="collapsed"
-    )
+pending_count = int(
+    (
+        analyzed["Risk Level"]
+        .isin(["Medium", "Low"])
+    ).sum()
+)
 
-else:
+avg_checklist = (
+    analyzed["Core Checklist %"]
+    .mean()
+    if len(analyzed)
+    else 0
+)
 
-    view = "Home"
+if pd.isna(avg_checklist):
+
+    avg_checklist = 0
 
 
 # -----------------------------------------------------------------------------
-# EMPLOYEE HELPERS
+# HELPER FUNCTIONS
 # -----------------------------------------------------------------------------
 
-def _employee_choices(df):
+def employee_choices(df):
 
     return [
         f"{r['Employee ID']} — {r['Employee Name']}"
@@ -1620,64 +2432,681 @@ def _employee_choices(df):
     ]
 
 
-def _choice_index(
-    choices,
-    employee_id
-):
+def get_employee(employee_id):
 
-    if not choices:
+    rows = analyzed[
+        analyzed["Employee ID"]
+        .astype(str)
+        == str(employee_id)
+    ]
 
-        return 0
+    if rows.empty:
 
-    for i, choice in enumerate(
-        choices
-    ):
+        return None
 
-        if (
-            choice.split(
-                " — ",
-                1
-            )[0].strip()
-            == str(employee_id)
-        ):
-
-            return i
-
-    return 0
+    return rows.iloc[0]
 
 
-def _sync_employee_from_widget(
-    widget_key
-):
+def risk_badge(risk):
 
-    choice = st.session_state.get(
-        widget_key
+    risk = _norm(risk)
+
+    if risk in ["Critical", "High"]:
+
+        return "badge-red"
+
+    if risk in ["Medium", "Low"]:
+
+        return "badge-yellow"
+
+    return "badge-green"
+
+
+def priority_badge(priority):
+
+    if priority == "Red":
+
+        return "badge-red"
+
+    if priority == "Yellow":
+
+        return "badge-yellow"
+
+    return "badge-green"
+
+
+def show_progress(percent):
+
+    try:
+
+        pct = float(percent) * 100
+
+    except Exception:
+
+        pct = 0
+
+    pct = max(
+        0,
+        min(
+            100,
+            pct
+        )
     )
 
-    if choice:
+    st.markdown(
+        f"""
+        <div class="progress-label">
 
-        st.session_state[
-            "selected_employee_id"
-        ] = (
-            choice.split(
-                " — ",
-                1
-            )[0].strip()
+            <span>Core onboarding readiness</span>
+            <strong>{pct:.0f}%</strong>
+
+        </div>
+
+        <div class="progress-container">
+
+            <div class="progress-bar"
+                 style="width:{pct:.0f}%;">
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# -----------------------------------------------------------------------------
+# OVERVIEW
+# -----------------------------------------------------------------------------
+
+def show_overview():
+
+    st.markdown(
+        f"""
+        <div class="hero">
+
+            <div class="hero-eyebrow">
+                HR Operations Intelligence
+            </div>
+
+            <div class="hero-title">
+                Welcome back, HR Admin
+            </div>
+
+            <div class="hero-text">
+                Monitor onboarding readiness, identify workflow
+                bottlenecks, and focus attention where action is needed.
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "### Onboarding Overview"
+    )
+
+    st.caption(
+        f"Live control tower status · {source_label}"
+    )
+
+    k1, k2, k3, k4 = st.columns(4)
+
+    with k1:
+
+        st.markdown(
+            f"""
+            <div class="kpi-card kpi-yellow">
+
+                <div class="kpi-label">
+                    Total Employees
+                </div>
+
+                <div class="kpi-value">
+                    {total_employees}
+                </div>
+
+                <div class="kpi-description">
+                    Active onboarding records
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with k2:
+
+        st.markdown(
+            f"""
+            <div class="kpi-card kpi-green">
+
+                <div class="kpi-label">
+                    Ready
+                </div>
+
+                <div class="kpi-value">
+                    {ready_count}
+                </div>
+
+                <div class="kpi-description">
+                    Fully operational
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with k3:
+
+        st.markdown(
+            f"""
+            <div class="kpi-card kpi-red">
+
+                <div class="kpi-label">
+                    Critical
+                </div>
+
+                <div class="kpi-value">
+                    {critical_count}
+                </div>
+
+                <div class="kpi-description">
+                    Requires immediate attention
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with k4:
+
+        st.markdown(
+            f"""
+            <div class="kpi-card kpi-blue">
+
+                <div class="kpi-label">
+                    Avg. Readiness
+                </div>
+
+                <div class="kpi-value">
+                    {avg_checklist * 100:.0f}%
+                </div>
+
+                <div class="kpi-description">
+                    Across core checklist
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        "<div class='section-title'>AI Onboarding Insights</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<div class='section-subtitle'>Signals generated from the current onboarding workflow data.</div>",
+        unsafe_allow_html=True
+    )
+
+    missing_items = []
+
+    for _, row in analyzed.iterrows():
+
+        text = _norm(
+            row.get(
+                "Missing Core Items"
+            )
+        )
+
+        if text and text != "None":
+
+            missing_items.extend(
+                [
+                    x.strip()
+                    for x in text.split(",")
+                    if x.strip()
+                ]
+            )
+
+    if missing_items:
+
+        most_common = (
+            pd.Series(
+                missing_items
+            )
+            .value_counts()
+            .index[0]
+        )
+
+    else:
+
+        most_common = "None"
+
+    pending_rows = analyzed[
+        analyzed["Risk Level"]
+        .isin(
+            [
+                "Critical",
+                "High"
+            ]
+        )
+    ]
+
+    if len(pending_rows):
+
+        top_department = (
+            pending_rows[
+                "Department"
+            ]
+            .astype(str)
+            .value_counts()
+            .index[0]
+        )
+
+    else:
+
+        top_department = "No high-risk department"
+
+    i1, i2, i3 = st.columns(3)
+
+    with i1:
+
+        st.markdown(
+            f"""
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Most common missing item
+                </div>
+
+                <div class="insight-value">
+                    {html.escape(most_common)}
+                </div>
+
+                <div class="insight-small">
+                    Based on incomplete core checklist items
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with i2:
+
+        st.markdown(
+            f"""
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Highest attention area
+                </div>
+
+                <div class="insight-value">
+                    {html.escape(str(top_department))}
+                </div>
+
+                <div class="insight-small">
+                    Department with the most Critical / High records
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with i3:
+
+        st.markdown(
+            f"""
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Employees requiring attention
+                </div>
+
+                <div class="insight-value">
+                    {critical_count + high_count}
+                </div>
+
+                <div class="insight-small">
+                    Critical + High risk onboarding records
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        "<div class='section-title'>Priority Queue</div>",
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        "<div class='section-subtitle'>Employees currently requiring the most attention.</div>",
+        unsafe_allow_html=True
+    )
+
+    priority_preview = analyzed[
+        analyzed["Priority"]
+        .isin(
+            [
+                "Red",
+                "Yellow"
+            ]
+        )
+    ].head(5)
+
+    if priority_preview.empty:
+
+        st.success(
+            "No pending employees are currently in the priority queue."
+        )
+
+    else:
+
+        for _, row in priority_preview.iterrows():
+
+            name = _norm(
+                row.get("Employee Name")
+            )
+
+            department = _norm(
+                row.get("Department")
+            )
+
+            risk = _norm(
+                row.get("Risk Level")
+            )
+
+            stage = _norm(
+                row.get("Current Stage")
+            )
+
+            priority = _norm(
+                row.get("Priority")
+            )
+
+            st.markdown(
+                f"""
+                <div class="employee-card">
+
+                    <div class="employee-name">
+                        {html.escape(name)}
+                    </div>
+
+                    <div class="employee-meta">
+                        {html.escape(department)}
+                        &nbsp; · &nbsp;
+                        {html.escape(stage)}
+                    </div>
+
+                    <div style="margin-top:10px;">
+
+                        <span class="status-badge {priority_badge(priority)}">
+                            {html.escape(priority)}
+                        </span>
+
+                        <span style="margin-left:7px;"
+                              class="status-badge {risk_badge(risk)}">
+                            {html.escape(risk)}
+                        </span>
+
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    st.markdown(
+        """
+        <div class="app-footer">
+            AI Onboarding Control Tower · Classroom prototype · Fictional/mock employee data
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+# -----------------------------------------------------------------------------
+# EMPLOYEE DIRECTORY
+# -----------------------------------------------------------------------------
+
+def show_employee_directory():
+
+    st.markdown(
+        """
+        <div class="section-title">
+            Employee Directory
+        </div>
+
+        <div class="section-subtitle">
+            Search and explore onboarding status across the employee population.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    search = st.text_input(
+        "Search employees",
+        placeholder="Search by employee name, ID, or department..."
+    )
+
+    filtered = analyzed.copy()
+
+    if search.strip():
+
+        q = search.strip().lower()
+
+        mask = (
+            filtered["Employee ID"]
+            .astype(str)
+            .str.lower()
+            .str.contains(q, na=False)
+            |
+            filtered["Employee Name"]
+            .astype(str)
+            .str.lower()
+            .str.contains(q, na=False)
+            |
+            filtered["Department"]
+            .astype(str)
+            .str.lower()
+            .str.contains(q, na=False)
+        )
+
+        filtered = filtered[mask]
+
+    st.caption(
+        f"{len(filtered)} employee record(s)"
+    )
+
+    if filtered.empty:
+
+        st.warning(
+            "No employees match your search."
+        )
+
+        return
+
+    for _, row in filtered.iterrows():
+
+        employee_id = _norm(
+            row.get("Employee ID")
+        )
+
+        name = _norm(
+            row.get("Employee Name")
+        )
+
+        department = _norm(
+            row.get("Department")
+        )
+
+        risk = _norm(
+            row.get("Risk Level")
+        )
+
+        stage = _norm(
+            row.get("Current Stage")
+        )
+
+        pct = row.get(
+            "Core Checklist %",
+            0
+        )
+
+        try:
+
+            pct_display = (
+                float(pct) * 100
+            )
+
+        except Exception:
+
+            pct_display = 0
+
+        c1, c2, c3 = st.columns(
+            [4, 2, 1]
+        )
+
+        with c1:
+
+            st.markdown(
+                f"""
+                <div class="employee-card">
+
+                    <div class="employee-name">
+                        {html.escape(name)}
+                    </div>
+
+                    <div class="employee-meta">
+                        ID: {html.escape(employee_id)}
+                        &nbsp; · &nbsp;
+                        {html.escape(department)}
+                    </div>
+
+                    <div style="margin-top:9px;">
+                        <span class="status-badge {risk_badge(risk)}">
+                            {html.escape(risk)}
+                        </span>
+                    </div>
+
+                    <div style="margin-top:10px;">
+
+                        <div class="progress-label">
+
+                            <span>
+                                Onboarding readiness
+                            </span>
+
+                            <strong>
+                                {pct_display:.0f}%
+                            </strong>
+
+                        </div>
+
+                        <div class="progress-container">
+
+                            <div class="progress-bar"
+                                 style="width:{pct_display:.0f}%;">
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with c2:
+
+            st.markdown(
+                f"""
+                <div style="
+                    background:#FFFFFF;
+                    border:1px solid #E4E7EB;
+                    border-radius:16px;
+                    padding:20px;
+                    min-height:100px;
+                ">
+
+                    <div class="insight-label">
+                        Current stage
+                    </div>
+
+                    <div style="
+                        margin-top:8px;
+                        font-size:13px;
+                        font-weight:700;
+                        color:#222222;
+                    ">
+                        {html.escape(stage)}
+                    </div>
+
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        with c3:
+
+            if st.button(
+                "View",
+                key=f"view_{employee_id}",
+                use_container_width=True
+            ):
+
+                st.session_state[
+                    "selected_employee_id"
+                ] = employee_id
+
+                st.session_state[
+                    "main_view"
+                ] = "Employee Profile"
+
+                st.rerun()
+
+        st.markdown(
+            "<div style='height:5px'></div>",
+            unsafe_allow_html=True
         )
 
 
 # -----------------------------------------------------------------------------
-# EMPLOYEE DETAIL
+# EMPLOYEE PROFILE
 # -----------------------------------------------------------------------------
 
-def show_employee_detail(row):
+def show_employee_profile():
 
-    employee_name = _norm(
-        row.get("Employee Name")
+    employee_id = st.session_state.get(
+        "selected_employee_id"
     )
 
-    employee_id = _norm(
-        row.get("Employee ID")
+    row = get_employee(
+        employee_id
+    )
+
+    if row is None:
+
+        st.warning(
+            "Select an employee from the Employee Directory first."
+        )
+
+        return
+
+    name = _norm(
+        row.get("Employee Name")
     )
 
     department = _norm(
@@ -1688,8 +3117,12 @@ def show_employee_detail(row):
         row.get("Employee Email")
     )
 
-    start_date = _fmt_start_date(
-        row.get("Start Date")
+    risk = _norm(
+        row.get("Risk Level")
+    )
+
+    stage = _norm(
+        row.get("Current Stage")
     )
 
     core_pct = row.get(
@@ -1699,135 +3132,149 @@ def show_employee_detail(row):
 
     try:
 
-        core_pct_display = (
-            f"{float(core_pct) * 100:.0f}%"
-        )
+        pct_display = float(
+            core_pct
+        ) * 100
 
     except Exception:
 
-        core_pct_display = "N/A"
+        pct_display = 0
 
-    core_ready = _norm(
-        row.get(
-            "Core Checklist Ready?"
-        )
-    )
-
-    risk = _norm(
-        row.get("Risk Level")
-    )
-
-    priority = _norm(
-        row.get("Priority")
-    )
-
-    priority_icon = {
-        "Red": "🔴",
-        "Yellow": "🟡",
-        "Green": "🟢"
-    }.get(
-        priority,
-        ""
-    )
+    initials = "".join(
+        [
+            x[0].upper()
+            for x in name.split()
+            if x
+        ]
+    )[:2]
 
     st.markdown(
-        f"## {employee_name}"
+        f"""
+        <div class="profile-header">
+
+            <div style="
+                display:flex;
+                align-items:center;
+                gap:17px;
+            ">
+
+                <div class="profile-avatar">
+                    {html.escape(initials)}
+                </div>
+
+                <div>
+
+                    <div class="profile-name">
+                        {html.escape(name)}
+                    </div>
+
+                    <div class="profile-meta">
+                        {html.escape(department)}
+                        &nbsp; · &nbsp;
+                        Employee ID {_norm(row.get("Employee ID"))}
+                    </div>
+
+                    <div style="margin-top:8px;">
+
+                        <span class="status-badge {risk_badge(risk)}">
+                            {html.escape(risk)} Risk
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    st.caption(
-        f"Employee ID: {employee_id}"
-    )
+    p1, p2, p3, p4 = st.columns(4)
 
-    st.markdown(
-        "### Employee Information"
-    )
-
-    info1, info2, info3, info4 = st.columns(4)
-
-    info1.metric(
-        "Employee ID",
-        employee_id
-    )
-
-    info2.metric(
-        "Department",
-        department
-        if department
-        else "N/A"
-    )
-
-    info3.metric(
+    p1.metric(
         "Start Date",
-        start_date
-    )
-
-    info4.metric(
-        "Risk Level",
-        risk
-        if risk
-        else "N/A"
-    )
-
-    info5, info6, info7, info8 = st.columns(4)
-
-    info5.metric(
-        "Employee Email",
-        employee_email
-        if employee_email
-        else "N/A"
-    )
-
-    info6.metric(
-        "Core Checklist %",
-        core_pct_display
-    )
-
-    info7.metric(
-        "Core Checklist Ready?",
-        core_ready
-        if core_ready
-        else "N/A"
-    )
-
-    info8.metric(
-        "Priority",
-        (
-            f"{priority_icon} {priority}"
-            if priority
-            else "N/A"
+        _fmt_start_date(
+            row.get("Start Date")
         )
     )
 
-    st.divider()
+    p2.metric(
+        "Readiness",
+        f"{pct_display:.0f}%"
+    )
 
-    st.markdown(
-        "### Onboarding Status"
+    p3.metric(
+        "Current Stage",
+        stage
+    )
+
+    p4.metric(
+        "Email",
+        employee_email or "N/A"
     )
 
     st.markdown(
-        f"**Current Stage:** "
-        f"{_norm(row.get('Current Stage'))}"
+        "### Onboarding readiness"
+    )
+
+    show_progress(
+        core_pct
     )
 
     st.markdown(
-        f"**Primary Bottleneck:** "
-        f"{_norm(row.get('Primary Bottleneck'))}"
+        "### Workflow intelligence"
     )
 
-    st.markdown(
-        f"**Blocked Downstream Task:** "
-        f"{_norm(row.get('Blocked Downstream Task'))}"
-    )
+    w1, w2 = st.columns(2)
 
-    st.markdown(
-        f"**Next Action:** "
-        f"{_norm(row.get('Next Action'))}"
-    )
+    with w1:
 
-    st.markdown(
-        f"**Responsible Party:** "
-        f"{_norm(row.get('Responsible Party'))}"
-    )
+        st.markdown(
+            f"""
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Primary bottleneck
+                </div>
+
+                <div class="insight-value">
+                    {html.escape(_norm(row.get("Primary Bottleneck")))}
+                </div>
+
+                <div class="insight-small">
+                    Current process constraint
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with w2:
+
+        st.markdown(
+            f"""
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Next action
+                </div>
+
+                <div class="insight-value">
+                    {html.escape(_norm(row.get("Next Action")))}
+                </div>
+
+                <div class="insight-small">
+                    Responsible party:
+                    {html.escape(_norm(row.get("Responsible Party")))}
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
 
     explanation = _norm(
         row.get(
@@ -1842,17 +3289,17 @@ def show_employee_detail(row):
         )
 
     st.markdown(
-        "### Onboarding Checklist"
+        "### Onboarding checklist"
     )
 
-    checklist_rows = []
-
-    all_checklist_items = (
+    checklist_items = (
         CORE_CHECKLIST
         + ["SafeColleges"]
     )
 
-    for item in all_checklist_items:
+    checklist_rows = []
+
+    for item in checklist_items:
 
         status = _norm(
             row.get(item)
@@ -1862,542 +3309,188 @@ def show_employee_detail(row):
 
             status = "Missing"
 
-        checklist_rows.append({
-            "Category": item,
-            "Status": status
-        })
+        checklist_rows.append(
+            {
+                "Requirement": item,
+                "Status": status
+            }
+        )
+
+    checklist_df = pd.DataFrame(
+        checklist_rows
+    )
 
     st.dataframe(
-        pd.DataFrame(
-            checklist_rows
-        ),
+        checklist_df,
         use_container_width=True,
         hide_index=True
     )
 
     st.markdown(
-        "### Additional Onboarding System Status"
+        "### System readiness"
     )
 
-    system_rows = [
-        {
-            "Category": "HRIS Employee ID",
-            "Status": _norm(
-                row.get(
-                    "HRIS Employee ID"
+    system_df = pd.DataFrame(
+        [
+            {
+                "System Gate": "HRIS Employee ID",
+                "Status": _norm(
+                    row.get(
+                        "HRIS Employee ID"
+                    )
                 )
-            )
-        },
-        {
-            "Category": "Payroll Screens",
-            "Status": _norm(
-                row.get(
-                    "Payroll Screens"
+            },
+            {
+                "System Gate": "Payroll Screens",
+                "Status": _norm(
+                    row.get(
+                        "Payroll Screens"
+                    )
                 )
-            )
-        },
-        {
-            "Category": "HR Notified IT",
-            "Status": _norm(
-                row.get(
-                    "HR Notified IT"
+            },
+            {
+                "System Gate": "HR Notified IT",
+                "Status": _norm(
+                    row.get(
+                        "HR Notified IT"
+                    )
                 )
-            )
-        },
-        {
-            "Category": "IT Email/System Access",
-            "Status": _norm(
-                row.get(
-                    "IT Email/System Access"
+            },
+            {
+                "System Gate": "IT Email/System Access",
+                "Status": _norm(
+                    row.get(
+                        "IT Email/System Access"
+                    )
                 )
-            )
-        },
-    ]
+            }
+        ]
+    )
 
     st.dataframe(
-        pd.DataFrame(
-            system_rows
-        ),
+        system_df,
         use_container_width=True,
         hide_index=True
     )
 
+    b1, b2 = st.columns(2)
 
-# -----------------------------------------------------------------------------
-# HOME
-# -----------------------------------------------------------------------------
+    with b1:
 
-if view == "Home":
+        if st.button(
+            "← Back to Employee Directory",
+            use_container_width=True
+        ):
 
-    show_home()
+            st.session_state[
+                "main_view"
+            ] = "Employee Directory"
 
+            st.rerun()
 
-# -----------------------------------------------------------------------------
-# SEARCH EMPLOYEE
-# -----------------------------------------------------------------------------
+    with b2:
 
-elif view == "Search Employee":
+        if st.button(
+            "Draft Follow-Up Email →",
+            type="primary",
+            use_container_width=True
+        ):
 
-    st.subheader(
-        "🔎 Search for New Employee Status"
-    )
+            st.session_state[
+                "main_view"
+            ] = "Communications"
 
-    st.write(
-        "Search using Employee ID, Employee Name, or Department."
-    )
-
-    st.info(
-        "You can use one search field at a time. "
-        "Department search will show all employees in that department."
-    )
-
-    search_id = st.text_input(
-        "Employee ID",
-        placeholder="Example: NH001"
-    )
-
-    search_name = st.text_input(
-        "Employee Name",
-        placeholder="Example: Jane Smith"
-    )
-
-    departments = sorted(
-        [
-            d
-            for d in
-            analyzed["Department"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .unique()
-            if d
-        ]
-    )
-
-    department_options = [
-        "Select a department"
-    ] + departments
-
-    search_department = st.selectbox(
-        "Department",
-        department_options
-    )
-
-    filtered = analyzed.copy()
-
-    search_performed = False
-
-    if search_id.strip():
-
-        search_performed = True
-
-        query = (
-            search_id
-            .strip()
-            .lower()
-        )
-
-        filtered = filtered[
-            filtered["Employee ID"]
-            .astype(str)
-            .str.lower()
-            .str.contains(
-                query,
-                na=False
-            )
-        ]
-
-    elif search_name.strip():
-
-        search_performed = True
-
-        query = (
-            search_name
-            .strip()
-            .lower()
-        )
-
-        filtered = filtered[
-            filtered["Employee Name"]
-            .astype(str)
-            .str.lower()
-            .str.contains(
-                query,
-                na=False
-            )
-        ]
-
-    elif (
-        search_department
-        != "Select a department"
-    ):
-
-        search_performed = True
-
-        filtered = filtered[
-            filtered["Department"]
-            .astype(str)
-            .str.strip()
-            == search_department
-        ]
-
-    if search_performed:
-
-        if filtered.empty:
-
-            st.warning(
-                "No employees were found matching your search."
-            )
-
-        else:
-
-            st.success(
-                f"{len(filtered)} employee(s) found."
-            )
-
-            if (
-                search_department
-                != "Select a department"
-                and not search_id.strip()
-                and not search_name.strip()
-            ):
-
-                st.markdown(
-                    f"### New Employees in "
-                    f"{search_department}"
-                )
-
-                department_display = filtered[
-                    [
-                        "Employee ID",
-                        "Employee Name",
-                        "Department",
-                        "Start Date",
-                        "Core Checklist %",
-                        "Core Checklist Ready?",
-                        "Risk Level",
-                    ]
-                ].copy()
-
-                department_display[
-                    "Core Checklist %"
-                ] = (
-                    department_display[
-                        "Core Checklist %"
-                    ]
-                    * 100
-                ).round(0).astype(int).astype(str) + "%"
-
-                department_display[
-                    "Start Date"
-                ] = (
-                    department_display[
-                        "Start Date"
-                    ]
-                    .apply(_fmt_start_date)
-                )
-
-                st.dataframe(
-                    department_display,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-            employee_choices = (
-                _employee_choices(
-                    filtered
-                )
-            )
-
-            if len(employee_choices) == 1:
-
-                selected_choice = (
-                    employee_choices[0]
-                )
-
-            else:
-
-                selected_choice = st.selectbox(
-                    "Select an employee to view details",
-                    employee_choices
-                )
-
-            selected_id = (
-                selected_choice
-                .split(
-                    " — ",
-                    1
-                )[0]
-                .strip()
-            )
-
-            selected_rows = analyzed[
-                analyzed["Employee ID"]
-                .astype(str)
-                == selected_id
-            ]
-
-            if not selected_rows.empty:
-
-                selected_row = (
-                    selected_rows.iloc[0]
-                )
-
-                st.divider()
-
-                show_employee_detail(
-                    selected_row
-                )
-
-                st.session_state[
-                    "selected_employee_id"
-                ] = selected_id
-
-    else:
-
-        st.markdown(
-            """
-            ### Search instructions
-
-            Enter an **Employee ID**, **Employee Name**, or choose a
-            **Department** above to view onboarding information.
-            """
-        )
+            st.rerun()
 
 
 # -----------------------------------------------------------------------------
-# EMPLOYEE STATISTICS
+# RISK MONITOR
 # -----------------------------------------------------------------------------
 
-elif view == "Employee Statistics":
-
-    st.subheader(
-        "📊 New Employees' Statistics"
-    )
-
-    st.write(
-        "Employees are ordered by risk level, "
-        "with higher-risk employees displayed first."
-    )
-
-    risk_order = {
-        "Critical": 0,
-        "High": 1,
-        "Medium": 2,
-        "Low": 3,
-        "Complete": 4
-    }
-
-    statistics = analyzed.copy()
-
-    statistics["_risk_order"] = (
-        statistics["Risk Level"]
-        .map(risk_order)
-        .fillna(99)
-    )
-
-    statistics = statistics.sort_values(
-        by=[
-            "_risk_order",
-            "Employee Name"
-        ],
-        ascending=[
-            True,
-            True
-        ]
-    )
-
-    statistics_display = statistics[
-        [
-            "Employee Name",
-            "Risk Level",
-            "Employee Email"
-        ]
-    ].copy()
-
-    statistics_display[
-        "Employee Email"
-    ] = (
-        statistics_display[
-            "Employee Email"
-        ].fillna("")
-    )
-
-    st.dataframe(
-        statistics_display,
-        use_container_width=True,
-        hide_index=True
-    )
-
-    st.divider()
+def show_risk_monitor():
 
     st.markdown(
-        "### Risk Summary"
+        """
+        <div class="section-title">
+            Risk Monitor
+        </div>
+
+        <div class="section-subtitle">
+            Prioritized view of employees requiring onboarding attention.
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    critical_n = int(
-        (
-            analyzed["Risk Level"]
-            == "Critical"
-        ).sum()
-    )
+    r1, r2, r3, r4 = st.columns(4)
 
-    high_n = int(
-        (
-            analyzed["Risk Level"]
-            == "High"
-        ).sum()
-    )
-
-    medium_n = int(
-        (
-            analyzed["Risk Level"]
-            == "Medium"
-        ).sum()
-    )
-
-    low_n = int(
-        (
-            analyzed["Risk Level"]
-            == "Low"
-        ).sum()
-    )
-
-    complete_n = int(
-        (
-            analyzed["Risk Level"]
-            == "Complete"
-        ).sum()
-    )
-
-    s1, s2, s3, s4, s5 = st.columns(5)
-
-    s1.metric(
+    r1.metric(
         "Critical",
-        critical_n
+        critical_count
     )
 
-    s2.metric(
+    r2.metric(
         "High",
-        high_n
+        high_count
     )
 
-    s3.metric(
-        "Medium",
-        medium_n
+    r3.metric(
+        "Pending",
+        pending_count
     )
 
-    s4.metric(
-        "Low",
-        low_n
-    )
-
-    s5.metric(
+    r4.metric(
         "Complete",
-        complete_n
+        ready_count
     )
 
-
-# -----------------------------------------------------------------------------
-# PRIORITY DASHBOARD
-# -----------------------------------------------------------------------------
-
-elif view == "Priority Dashboard":
-
-    st.subheader(
-        "Priority Control Tower"
-    )
-
-    st.caption(
-        f"Source: {source_label} | "
-        f"Days to Start recalculated as of "
-        f"{as_of_text}"
-    )
-
-    total = len(analyzed)
-
-    red_n = int(
-        (
-            analyzed["Priority"]
-            == "Red"
-        ).sum()
-    )
-
-    yellow_n = int(
-        (
-            analyzed["Priority"]
-            == "Yellow"
-        ).sum()
-    )
-
-    green_n = int(
-        (
-            analyzed["Priority"]
-            == "Green"
-        ).sum()
-    )
-
-    m1, m2, m3, m4 = st.columns(4)
-
-    m1.metric(
-        "Employees",
-        total
-    )
-
-    m2.metric(
-        "🔴 Urgent",
-        red_n
-    )
-
-    m3.metric(
-        "🟡 Pending",
-        yellow_n
-    )
-
-    m4.metric(
-        "🟢 Complete",
-        green_n
-    )
-
-    st.markdown(
-        """
-        **Priority logic:**
-
-        🔴 Pending + start date within 7 days/overdue
-
-        🟡 Pending + later start date
-
-        🟢 Fully operational
-        """
-    )
-
-    display_cols = [
-        "Priority",
-        "Employee ID",
-        "Employee Name",
-        "Department",
-        "Start Date",
-        "Days to Start",
-        "Current Stage",
-        "Primary Bottleneck",
-        "Blocked Downstream Task",
-        "Next Action",
-        "Responsible Party",
-        "Risk Level"
-    ]
-
-    disp = analyzed[
-        display_cols
+    risk_df = analyzed[
+        [
+            "Priority",
+            "Employee ID",
+            "Employee Name",
+            "Department",
+            "Start Date",
+            "Days to Start",
+            "Current Stage",
+            "Primary Bottleneck",
+            "Next Action",
+            "Responsible Party",
+            "Risk Level"
+        ]
     ].copy()
 
+    st.markdown(
+        "### Priority queue"
+    )
+
     st.dataframe(
-        disp,
+        risk_df,
         use_container_width=True,
         hide_index=True,
-        height=560
+        height=500
     )
 
-    # Keep the same chart logic
+
+# -----------------------------------------------------------------------------
+# ANALYTICS
+# -----------------------------------------------------------------------------
+
+def show_analytics():
+
+    st.markdown(
+        """
+        <div class="section-title">
+            Analytics
+        </div>
+
+        <div class="section-subtitle">
+            Understand how employees are moving through the onboarding workflow.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     stage_counts = (
         analyzed["Current Stage"]
         .value_counts()
@@ -2417,12 +3510,19 @@ elif view == "Priority Dashboard":
         stage_counts,
         x="Stage",
         y="Employees",
-        title="Employees by Current Stage"
+        title="Employees by onboarding stage"
     )
 
     fig_stage.update_layout(
-        xaxis_tickangle=-30,
-        height=430
+        height=420,
+        margin=dict(
+            l=10,
+            r=10,
+            t=50,
+            b=90
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white"
     )
 
     risk_counts = (
@@ -2444,61 +3544,118 @@ elif view == "Priority Dashboard":
         risk_counts,
         x="Risk",
         y="Employees",
-        title="Employees by Risk Level"
+        title="Employees by risk level"
     )
 
     fig_risk.update_layout(
-        height=380
+        height=420,
+        margin=dict(
+            l=10,
+            r=10,
+            t=50,
+            b=40
+        ),
+        plot_bgcolor="white",
+        paper_bgcolor="white"
     )
 
-    p1, p2 = st.columns(2)
+    a1, a2 = st.columns(2)
 
-    with p1:
+    with a1:
 
         st.plotly_chart(
             fig_stage,
             use_container_width=True
         )
 
-    with p2:
+    with a2:
 
         st.plotly_chart(
             fig_risk,
             use_container_width=True
         )
 
-
-# -----------------------------------------------------------------------------
-# EMPLOYEE DETAIL
-# -----------------------------------------------------------------------------
-
-elif view == "Employee Detail":
-
-    st.subheader(
-        "Employee Control Tower"
+    st.markdown(
+        "### Department overview"
     )
 
-    choices = _employee_choices(
+    department_df = (
+        analyzed.groupby(
+            "Department",
+            dropna=False
+        )
+        .agg(
+            Employees=(
+                "Employee ID",
+                "count"
+            ),
+            Avg_Readiness=(
+                "Core Checklist %",
+                "mean"
+            )
+        )
+        .reset_index()
+    )
+
+    department_df[
+        "Avg_Readiness"
+    ] = (
+        department_df[
+            "Avg_Readiness"
+        ] * 100
+    ).round(0)
+
+    department_df = department_df.rename(
+        columns={
+            "Avg_Readiness":
+            "Average Readiness %"
+        }
+    )
+
+    st.dataframe(
+        department_df,
+        use_container_width=True,
+        hide_index=True
+    )
+
+
+# -----------------------------------------------------------------------------
+# COMMUNICATIONS
+# -----------------------------------------------------------------------------
+
+def show_communications():
+
+    st.markdown(
+        """
+        <div class="section-title">
+            Communications
+        </div>
+
+        <div class="section-subtitle">
+            Create a workflow-based follow-up message for an employee or stakeholder.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    choices = employee_choices(
         analyzed
     )
 
-    detail_index = _choice_index(
-        choices,
-        st.session_state.get(
-            "selected_employee_id"
+    if not choices:
+
+        st.warning(
+            "No employees are available."
         )
-    )
+
+        return
 
     selected = st.selectbox(
-        "Select employee",
-        choices,
-        index=detail_index,
-        key="detail_emp",
-        on_change=_sync_employee_from_widget,
-        args=("detail_emp",)
+        "Employee",
+        choices
     )
 
-    emp_id = (
+    employee_id = (
         selected
         .split(
             " — ",
@@ -2508,139 +3665,44 @@ elif view == "Employee Detail":
 
     st.session_state[
         "selected_employee_id"
-    ] = emp_id
+    ] = employee_id
 
-    selected_rows = analyzed[
-        analyzed["Employee ID"]
-        .astype(str)
-        == emp_id
-    ]
-
-    if not selected_rows.empty:
-
-        row = selected_rows.iloc[0]
-
-        show_employee_detail(
-            row
-        )
-
-        st.divider()
-
-        b1, b2 = st.columns(
-            [1, 3]
-        )
-
-        with b1:
-
-            if st.button(
-                "✉️ Draft follow-up email",
-                type="primary",
-                use_container_width=True
-            ):
-
-                st.session_state[
-                    "main_view"
-                ] = "Communications"
-
-                st.rerun()
-
-        with b2:
-
-            st.caption(
-                "The Communications page will open with this employee already selected."
-            )
-
-
-# -----------------------------------------------------------------------------
-# COMMUNICATIONS
-# -----------------------------------------------------------------------------
-
-elif view == "Communications":
-
-    st.subheader(
-        "Draft Follow-Up Email"
+    row = get_employee(
+        employee_id
     )
-
-    choices = _employee_choices(
-        analyzed
-    )
-
-    comm_index = _choice_index(
-        choices,
-        st.session_state.get(
-            "selected_employee_id"
-        )
-    )
-
-    selected2 = st.selectbox(
-        "Employee for communication",
-        choices,
-        index=comm_index,
-        key="comm_emp",
-        on_change=_sync_employee_from_widget,
-        args=("comm_emp",)
-    )
-
-    emp_id2 = (
-        selected2
-        .split(
-            " — ",
-            1
-        )[0]
-    )
-
-    st.session_state[
-        "selected_employee_id"
-    ] = emp_id2
-
-    row2 = analyzed[
-        analyzed["Employee ID"]
-        .astype(str)
-        == emp_id2
-    ].iloc[0]
 
     route = resolve_recipient(
-        row2,
-        login_email=sender_email,
-        default_it_email=default_it_email,
+        row,
+        login_email="hr.onboarding@example.com",
+        default_it_email="it.access@example.com",
         contact_df=contact_df
-    )
-
-    st.caption(
-        f"Suggested recipient role: {route['role']}. "
-        "Recipient comes from workflow ownership + contact data, "
-        "not AI guessing."
     )
 
     to_email = st.text_input(
         "To",
-        value=route["to"],
-        key=f"to_{emp_id2}"
+        value=route["to"]
     )
 
     cc_email = st.text_input(
         "CC",
-        value=route["cc"],
-        key=f"cc_{emp_id2}"
+        value=route["cc"]
     )
 
     subject = st.text_input(
         "Subject",
-        value=suggested_subject(row2),
-        key=f"subject_{emp_id2}"
-    )
-
-    body_default = deterministic_reminder(
-        row2,
-        sender_name=sender_name,
-        recipient_role=route["role"]
+        value=suggested_subject(
+            row
+        )
     )
 
     body = st.text_area(
-        "Email body",
-        value=body_default,
-        height=260,
-        key=f"body_{emp_id2}"
+        "Message",
+        value=deterministic_reminder(
+            row,
+            sender_name="HR Admin",
+            recipient_role=route["role"]
+        ),
+        height=260
     )
 
     if to_email:
@@ -2671,20 +3733,13 @@ elif view == "Communications":
             gmail_url
         )
 
-    else:
-
-        st.warning(
-            "No email address could be resolved. "
-            "Confirm or enter the recipient manually."
-        )
-
     if st.button(
-        "Send Email (Demo)"
+        "Log Demo Communication",
+        type="primary"
     ):
 
         st.success(
-            "Demo email logged as sent. "
-            "No external email was transmitted."
+            "Demo communication logged. No external email was transmitted."
         )
 
 
@@ -2692,174 +3747,164 @@ elif view == "Communications":
 # RULE VALIDATION
 # -----------------------------------------------------------------------------
 
-elif view == "Rule Validation":
+def show_rule_validation():
 
-    st.subheader(
-        "Rule Validation"
+    st.markdown(
+        """
+        <div class="section-title">
+            Rule Validation
+        </div>
+
+        <div class="section-subtitle">
+            Test whether the workflow logic produces the expected stage,
+            bottleneck, and next action.
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
-    if (
-        test_df is None
-        or test_df.empty
-    ):
+    if test_df.empty:
 
-        st.markdown(
-            """
-            ### Rule Validation
-
-            No `Test_Cases` sheet was found.
-            The app can still run normally.
-            """
+        st.info(
+            "No Test_Cases worksheet was found."
         )
 
-    else:
+        return
 
-        rows = []
+    rows = []
 
-        for _, t in test_df.iterrows():
+    for _, t in test_df.iterrows():
 
-            scenario = _norm(
-                t.get("Scenario")
+        scenario = _norm(
+            t.get("Scenario")
+        )
+
+        expected_stage = _norm(
+            t.get("Expected Stage")
+        )
+
+        expected_b = _norm(
+            t.get("Expected Bottleneck")
+        )
+
+        expected_a = _norm(
+            t.get("Expected Next Action")
+        )
+
+        candidates = pd.DataFrame()
+
+        use_rows = _norm(
+            t.get(
+                "Use These Employee Rows"
             )
+        )
 
-            expected_stage = _norm(
-                t.get("Expected Stage")
-            )
+        if "-" in use_rows:
 
-            expected_b = _norm(
-                t.get("Expected Bottleneck")
-            )
+            try:
 
-            expected_a = _norm(
-                t.get("Expected Next Action")
-            )
-
-            candidates = pd.DataFrame()
-
-            if "Scenario Tag" in analyzed.columns:
-
-                candidates = analyzed[
-                    analyzed[
-                        "Scenario Tag"
-                    ]
-                    .astype(str)
-                    .str.contains(
-                        scenario,
-                        regex=False,
-                        na=False
-                    )
-                ]
-
-            if candidates.empty:
-
-                use_rows = _norm(
-                    t.get(
-                        "Use These Employee Rows"
+                start, end = (
+                    use_rows.split(
+                        "-",
+                        1
                     )
                 )
 
-                if "-" in use_rows:
-
-                    start, end = (
-                        use_rows.split(
-                            "-",
-                            1
-                        )
+                lo = int(
+                    start.replace(
+                        "NH",
+                        ""
                     )
+                )
 
-                    try:
+                hi = int(
+                    end.replace(
+                        "NH",
+                        ""
+                    )
+                )
 
-                        lo = int(
-                            start.replace(
-                                "NH",
-                                ""
-                            )
-                        )
+                ids = (
+                    analyzed[
+                        "Employee ID"
+                    ]
+                    .astype(str)
+                )
 
-                        hi = int(
-                            end.replace(
-                                "NH",
-                                ""
-                            )
-                        )
+                nums = (
+                    ids
+                    .str.replace(
+                        "NH",
+                        "",
+                        regex=False
+                    )
+                    .astype(int)
+                )
 
-                        ids = (
-                            analyzed[
-                                "Employee ID"
-                            ]
-                            .astype(str)
-                        )
+                candidates = analyzed[
+                    (
+                        nums >= lo
+                    )
+                    &
+                    (
+                        nums <= hi
+                    )
+                ]
 
-                        nums = (
-                            ids
-                            .str.replace(
-                                "NH",
-                                "",
-                                regex=False
-                            )
-                            .astype(int)
-                        )
+            except Exception:
 
-                        candidates = analyzed[
-                            (
-                                nums >= lo
-                            )
-                            & (
-                                nums <= hi
-                            )
-                        ]
+                candidates = pd.DataFrame()
 
-                    except Exception:
+        if candidates.empty:
 
-                        candidates = pd.DataFrame()
-
-            if candidates.empty:
-
-                rows.append([
+            rows.append(
+                [
                     scenario,
                     "NOT FOUND",
                     expected_stage,
                     "—",
                     "—",
                     "FAIL"
-                ])
-
-                continue
-
-            actual_stage = (
-                candidates[
-                    "Current Stage"
                 ]
-                .mode()
-                .iat[0]
             )
 
-            actual_b = (
-                candidates[
-                    "Primary Bottleneck"
-                ]
-                .mode()
-                .iat[0]
-            )
+            continue
 
-            actual_a = (
-                candidates[
-                    "Next Action"
-                ]
-                .mode()
-                .iat[0]
-            )
+        actual_stage = (
+            candidates[
+                "Current Stage"
+            ]
+            .mode()
+            .iat[0]
+        )
 
-            passed = (
-                actual_stage
-                == expected_stage
-                and actual_b
-                == expected_b
-                and actual_a
-                == expected_a
-            )
+        actual_b = (
+            candidates[
+                "Primary Bottleneck"
+            ]
+            .mode()
+            .iat[0]
+        )
 
-            rows.append([
+        actual_a = (
+            candidates[
+                "Next Action"
+            ]
+            .mode()
+            .iat[0]
+        )
+
+        passed = (
+            actual_stage
+            == expected_stage
+            and actual_b
+            == expected_b
+            and actual_a
+            == expected_a
+        )
+
+        rows.append(
+            [
                 scenario,
                 actual_stage,
                 expected_stage,
@@ -2870,91 +3915,194 @@ elif view == "Rule Validation":
                     if passed
                     else "FAIL"
                 )
-            ])
-
-        result = pd.DataFrame(
-            rows,
-            columns=[
-                "Scenario",
-                "Actual Stage",
-                "Expected Stage",
-                "Actual Bottleneck",
-                "Actual Next Action",
-                "Result"
             ]
         )
 
-        n_pass = int(
-            (
-                result["Result"]
-                == "PASS"
-            ).sum()
-        )
+    result = pd.DataFrame(
+        rows,
+        columns=[
+            "Scenario",
+            "Actual Stage",
+            "Expected Stage",
+            "Actual Bottleneck",
+            "Actual Next Action",
+            "Result"
+        ]
+    )
 
-        st.markdown(
-            f"### Rule Validation\n"
-            f"**{n_pass} of {len(result)} "
-            f"supplied scenarios passed.**"
-        )
+    passed_count = int(
+        (
+            result["Result"]
+            == "PASS"
+        ).sum()
+    )
 
-        st.dataframe(
-            result,
-            use_container_width=True,
-            hide_index=True
-        )
+    st.metric(
+        "Validation pass rate",
+        f"{passed_count}/{len(result)}"
+    )
+
+    st.dataframe(
+        result,
+        use_container_width=True,
+        hide_index=True
+    )
 
 
 # -----------------------------------------------------------------------------
 # ABOUT
 # -----------------------------------------------------------------------------
 
-elif view == "About":
-
-    st.subheader(
-        "About the Prototype"
-    )
+def show_about():
 
     st.markdown(
         """
-        **AI Onboarding Control Tower**
+        <div class="hero">
 
-        This classroom prototype helps HR monitor the employee
-        onboarding process from accepted offer through operational readiness.
+            <div class="hero-eyebrow">
+                About the prototype
+            </div>
 
-        ### Core Functions
+            <div class="hero-title">
+                AI Onboarding Control Tower
+            </div>
 
-        - Search employees by Employee ID
-        - Search employees by Employee Name
-        - Search employees by Department
-        - View employee department and start date
-        - Identify missing onboarding checklist items
-        - Calculate Core Checklist %
-        - Determine whether the Core Checklist is ready
-        - Identify onboarding risk
-        - Identify workflow bottlenecks
-        - Identify the responsible party
-        - Show the next required action
-        - Prioritize employees by risk and urgency
-        - Draft follow-up communication
+            <div class="hero-text">
+                A classroom prototype designed to improve visibility
+                across the employee onboarding lifecycle.
+            </div>
 
-        ### Data Sources
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-        The prototype supports:
+    a1, a2, a3 = st.columns(3)
 
-        - Excel workbook upload
-        - Live Google Sheet connection
-        - Manual Google Sheet refresh
+    with a1:
 
-        HR can update the Google Sheet and then use
-        **Refresh Data** to bring the latest information
-        into the Control Tower.
+        st.markdown(
+            """
+            <div class="insight-card">
 
-        ### Prototype Boundary
+                <div class="insight-label">
+                    Visibility
+                </div>
 
+                <div class="insight-value">
+                    One view of onboarding status
+                </div>
+
+                <div class="insight-small">
+                    Track readiness, workflow stage, and missing requirements.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with a2:
+
+        st.markdown(
+            """
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Risk
+                </div>
+
+                <div class="insight-value">
+                    Surface employees needing attention
+                </div>
+
+                <div class="insight-small">
+                    Prioritize based on onboarding status and timing.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    with a3:
+
+        st.markdown(
+            """
+            <div class="insight-card">
+
+                <div class="insight-label">
+                    Action
+                </div>
+
+                <div class="insight-value">
+                    Connect blockers to next steps
+                </div>
+
+                <div class="insight-small">
+                    Identify the responsible stakeholder and next action.
+                </div>
+
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        "### Prototype boundaries"
+    )
+
+    st.write(
+        """
         This application is designed for classroom demonstration
-        using fictional/mock employee data.
-
-        Do not publish real employee HR information in a public
-        Streamlit application.
+        using fictional/mock employee data. It is not intended to
+        replace a production HR information system or serve as a
+        secure authentication platform.
         """
     )
+
+
+# -----------------------------------------------------------------------------
+# ROUTER
+# -----------------------------------------------------------------------------
+
+view = st.session_state[
+    "main_view"
+]
+
+
+if view == "Overview":
+
+    show_overview()
+
+elif view == "Employee Directory":
+
+    show_employee_directory()
+
+elif view == "Employee Profile":
+
+    show_employee_profile()
+
+elif view == "Risk Monitor":
+
+    show_risk_monitor()
+
+elif view == "Analytics":
+
+    show_analytics()
+
+elif view == "Communications":
+
+    show_communications()
+
+elif view == "Rule Validation":
+
+    show_rule_validation()
+
+elif view == "Data Management":
+
+    show_data_management()
+
+elif view == "About":
+
+    show_about()
