@@ -1045,9 +1045,16 @@ def show_sidebar():
             label_visibility="collapsed",
         )
 #changing above
-        if selected != st.session_state.main_view:
+        #if selected != st.session_state.main_view:
+            #st.session_state.main_view = selected
+            #st.rerun()
+        if (
+            st.session_state.main_view != "Employee Profile"
+            and selected != st.session_state.main_view
+        ):
             st.session_state.main_view = selected
             st.rerun()
+            ### changing above 2.0
 
         st.divider()
 
