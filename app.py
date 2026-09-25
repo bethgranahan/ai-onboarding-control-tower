@@ -2804,7 +2804,7 @@ def show_about():
     )
 
     st.subheader(
-        "AI Onboarding Control Tower"
+        "AI Onboarding Control Tower 🗼⏱️"
     )
 
     st.write(
