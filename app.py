@@ -1001,7 +1001,7 @@ NAV_OPTIONS = [
     "Communications",
     "Rule Validation",
     "Data Management",
-    "Employee Profile",
+    #"Employee Profile",
     "About",
 ]
 
@@ -1027,18 +1027,24 @@ def show_sidebar():
 
         st.divider()
 
+        # changing below 
+        current_navigation_view = st.session_state.mainview
+
+        if current_navigation_view == "Employee Profile":
+            current_navigation_view = "Employee Directory"
+
         selected = st.radio(
             "Navigation",
             NAV_OPTIONS,
             index=NAV_OPTIONS.index(
-                st.session_state.main_view
+                current_navigation_view
             ),
             format_func=lambda item: (
                 f"{NAV_ICONS.get(item, '')}   {item}"
             ),
             label_visibility="collapsed",
         )
-
+#changing above
         if selected != st.session_state.main_view:
             st.session_state.main_view = selected
             st.rerun()
