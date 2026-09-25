@@ -1028,7 +1028,7 @@ def show_sidebar():
         st.divider()
 
         # changing below 
-        current_navigation_view = st.session_state.mainview
+        current_navigation_view = st.session_state.main_view
 
         if current_navigation_view == "Employee Profile":
             current_navigation_view = "Employee Directory"
