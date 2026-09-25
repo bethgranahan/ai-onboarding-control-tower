@@ -1001,6 +1001,7 @@ NAV_OPTIONS = [
     "Communications",
     "Rule Validation",
     "Data Management",
+    "Employee Profile",
     "About",
 ]
 
