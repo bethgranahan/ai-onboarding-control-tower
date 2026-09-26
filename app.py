@@ -2720,31 +2720,60 @@ def show_rule_validation(df):
             #)
         #)
 
-        actual_next_action = _norm(
-            actual["Next Action"]
-        )
-        normalized_expected_action = (
-            expected_next_action
-            .replace(
-                "complete missing item:",
-                "complete"
-            )
-            .strip()
-        )
+        # actual_next_action = _norm(
+        #     actual["Next Action"]
+        # )
+        # normalized_expected_action = (
+        #     expected_next_action
+        #     .replace(
+        #         "complete missing item:",
+        #         "complete"
+        #     )
+        #     .strip()
+        # )
         
-        normalized_actual_action = (
-            actual_next_action
-            .replace(
-                "complete missing item:",
-                "complete"
-            )
-            .strip()
-        )
-        next_action_pass = (
-            not normalized_expected_action
-            or normalized_expected_action
-            == normalized_actual_action
-        )
+        # normalized_actual_action = (
+        #     actual_next_action
+        #     .replace(
+        #         "complete missing item:",
+        #         "complete"
+        #     )
+        #     .strip()
+        # )
+        # next_action_pass = (
+        #     not normalized_expected_action
+        #     or normalized_expected_action
+        #     == normalized_actual_action
+        # )
+    ##
+    actual_next_action = _norm(
+    actual["Next Action"]
+).lower()
+
+normalized_expected_action = (
+    expected_next_action
+    .lower()
+    .replace(
+        "complete missing item:",
+        "complete"
+    )
+    .strip()
+)
+
+normalized_actual_action = (
+    actual_next_action
+    .replace(
+        "complete missing item:",
+        "complete"
+    )
+    .strip()
+)
+
+next_action_pass = (
+    not normalized_expected_action
+    or normalized_expected_action
+    == normalized_actual_action
+)
 
 
         # new code above
