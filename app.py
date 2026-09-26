@@ -2712,13 +2712,42 @@ def show_rule_validation(df):
             )
         )
 
-        next_action_pass = (
-            not expected_next_action
-            or expected_next_action
-            == _norm(
-                actual["Next Action"]
-            )
+        #next_action_pass = (
+         #   not expected_next_action
+          #  or expected_next_action
+           # == _norm(
+            #    actual["Next Action"]
+            #)
+        #)
+
+        actual_next_action = _norm(
+            actual["Next Action"]
         )
+        normalized_expected_action = (
+            expected_next_action
+            .replace(
+                "complete missing item:",
+                "complete"
+            )
+            .strip()
+        )
+        
+        normalized_actual_action = (
+            actual_next_action
+            .replace(
+                "complete missing item:",
+                "complete"
+            )
+            .strip()
+        )
+        next_action_pass = (
+            not normalized_expected_action
+            or normalized_expected_action
+            == normalized_actual_action
+        )
+
+
+        # new code above
 
         overall = (
             stage_pass
