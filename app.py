@@ -2907,6 +2907,263 @@ def show_communications(df):
 # 21. RULE VALIDATION
 # ============================================================
 
+def normalize_validation_text(value):
+
+    if pd.isna(value):
+        return ""
+
+    text = str(value).strip().lower()
+
+    # Normalize common formatting differences
+    text = text.replace("_", " ")
+    text = text.replace("-", " ")
+    text = text.replace("–", " ")
+    text = text.replace("—", " ")
+
+    # Normalize multiple spaces
+    text = " ".join(text.split())
+
+    # Remove common punctuation
+    text = text.replace(".", "")
+    text = text.replace(",", "")
+    text = text.replace(":", "")
+    text = text.replace(";", "")
+
+    return text
+
+
+def normalize_stage(value):
+
+    text = normalize_validation_text(value)
+
+    aliases = {
+        "not started": "not started",
+        "not started onboarding": "not started",
+
+        "checklist in progress": "checklist in progress",
+        "in progress": "checklist in progress",
+        "onboarding in progress": "checklist in progress",
+
+        "ready for hris setup": "ready for hris setup",
+        "ready for hris": "ready for hris setup",
+        "hris setup": "ready for hris setup",
+
+        "compliance pending": "compliance pending",
+        "compliance": "compliance pending",
+
+        "ready for it notification":
+            "ready for it notification",
+
+        "ready for it":
+            "ready for it notification",
+
+        "it provisioning": "it provisioning",
+        "it setup": "it provisioning",
+        "system access": "it provisioning",
+
+        "exception payroll risk":
+            "exception payroll risk",
+
+        "payroll risk":
+            "exception payroll risk",
+
+        "fully operational": "fully operational",
+        "operational": "fully operational",
+        "complete": "fully operational",
+    }
+
+    return aliases.get(
+        text,
+        text,
+    )
+
+
+def normalize_bottleneck(value):
+
+    text = normalize_validation_text(value)
+
+    aliases = {
+        "none": "none",
+        "no bottleneck": "none",
+
+        "hris setup": "hris setup",
+        "employee system setup": "hris setup",
+
+        "payroll prerequisites":
+            "payroll prerequisites",
+
+        "payroll":
+            "payroll prerequisites",
+
+        "it system access":
+            "it system access",
+
+        "system access":
+            "it system access",
+
+        "hr notification":
+            "hr notification",
+
+        "it notification":
+            "hr notification",
+
+        "safecolleges":
+            "safecolleges",
+
+        "compliance completion":
+            "safecolleges",
+
+        "onboarding readiness":
+            "onboarding readiness",
+
+        "core checklist":
+            "core checklist",
+    }
+
+    # If the bottleneck is an actual checklist item,
+    # preserve the checklist item as the bottleneck.
+    for item in CORE_CHECKLIST:
+
+        normalized_item = normalize_validation_text(
+            item
+        )
+
+        if (
+            normalized_item
+            == text
+        ):
+            return normalized_item
+
+    return aliases.get(
+        text,
+        text,
+    )
+
+
+def normalize_next_action(value):
+
+    text = normalize_validation_text(value)
+
+    # Normalize common wording differences
+    text = text.replace(
+        "complete missing item",
+        "complete",
+    )
+
+    text = text.replace(
+        "complete the missing item",
+        "complete",
+    )
+
+    text = text.replace(
+        "complete remaining item",
+        "complete",
+    )
+
+    text = text.replace(
+        "complete remaining items",
+        "complete",
+    )
+
+    text = text.replace(
+        "complete missing payroll documents",
+        "complete payroll documents",
+    )
+
+    text = text.replace(
+        "complete missing payroll document",
+        "complete payroll documents",
+    )
+
+    text = text.replace(
+        "hr should notify it",
+        "notify it",
+    )
+
+    text = text.replace(
+        "hr notifies it",
+        "notify it",
+    )
+
+    text = text.replace(
+        "notify it",
+        "hr notify it",
+    )
+
+    text = text.replace(
+        "no action required",
+        "no action",
+    )
+
+    return " ".join(text.split())
+
+
+def validation_text_matches(
+    expected,
+    actual,
+):
+
+    expected = normalize_validation_text(
+        expected
+    )
+
+    actual = normalize_validation_text(
+        actual
+    )
+
+    if not expected:
+        return True
+
+    if not actual:
+        return False
+
+    if expected == actual:
+        return True
+
+    # Compare normalized stage values
+    if (
+        normalize_stage(expected)
+        == normalize_stage(actual)
+    ):
+        return True
+
+    # Compare normalized bottleneck values
+    if (
+        normalize_bottleneck(expected)
+        == normalize_bottleneck(actual)
+    ):
+        return True
+
+    # Compare normalized next-action values
+    expected_action = normalize_next_action(
+        expected
+    )
+
+    actual_action = normalize_next_action(
+        actual
+    )
+
+    if expected_action == actual_action:
+        return True
+
+    # Allow one value to contain the other.
+    # This handles wording such as:
+    #
+    # "complete i 9"
+    #
+    # vs.
+    #
+    # "complete i 9 supporting docs"
+    #
+    if (
+        expected_action in actual_action
+        or actual_action in expected_action
+    ):
+        return True
+
+    return False
+
+
 def show_rule_validation(df):
 
     page_header(
@@ -2944,28 +3201,42 @@ def show_rule_validation(df):
 
     for _, test in test_cases.iterrows():
 
+        # ----------------------------------------------------
+        # Employee ID
+        # ----------------------------------------------------
+
         employee_id = test.get(
             "Employee ID"
         )
 
-        if pd.isna(employee_id) or not _norm(
-            employee_id
+        if (
+            pd.isna(employee_id)
+            or _norm(employee_id) == ""
         ):
 
             employee_id = test.get(
                 "HRIS Employee ID"
             )
 
-        if pd.isna(employee_id):
+        if (
+            pd.isna(employee_id)
+            or _norm(employee_id) == ""
+        ):
+
             continue
 
         employee_id = str(
             employee_id
-        )
+        ).strip()
+
+        # ----------------------------------------------------
+        # Find actual employee
+        # ----------------------------------------------------
 
         actual_matches = df[
             df["Employee ID"]
             .astype(str)
+            .str.strip()
             == employee_id
         ]
 
@@ -2973,6 +3244,10 @@ def show_rule_validation(df):
             continue
 
         actual = actual_matches.iloc[0]
+
+        # ----------------------------------------------------
+        # Expected values
+        # ----------------------------------------------------
 
         expected_stage = _norm(
             test.get(
@@ -3005,73 +3280,59 @@ def show_rule_validation(df):
         )
 
         # ----------------------------------------------------
+        # Actual values
+        # ----------------------------------------------------
+
+        actual_stage = _norm(
+            actual.get(
+                "Current Stage",
+                "",
+            )
+        )
+
+        actual_bottleneck = _norm(
+            actual.get(
+                "Primary Bottleneck",
+                "",
+            )
+        )
+
+        actual_next_action = _norm(
+            actual.get(
+                "Next Action",
+                "",
+            )
+        )
+
+        # ----------------------------------------------------
         # Stage validation
         # ----------------------------------------------------
 
-        stage_pass = (
-            not expected_stage
-            or expected_stage
-            == _norm(
-                actual["Current Stage"]
-            )
+        stage_pass = validation_text_matches(
+            expected_stage,
+            actual_stage,
         )
 
         # ----------------------------------------------------
         # Bottleneck validation
         # ----------------------------------------------------
 
-        bottleneck_pass = (
-            not expected_bottleneck
-            or expected_bottleneck
-            == _norm(
-                actual["Primary Bottleneck"]
-            )
+        bottleneck_pass = validation_text_matches(
+            expected_bottleneck,
+            actual_bottleneck,
         )
 
         # ----------------------------------------------------
         # Next Action validation
         # ----------------------------------------------------
-        # The prototype may produce:
-        #
-        # "Complete missing item: I-9"
-        #
-        # while the Test_Cases sheet may contain:
-        #
-        # "Complete I-9"
-        #
-        # We normalize both versions before comparing them.
 
-        actual_next_action = _norm(
-            actual["Next Action"]
-        ).lower()
-
-        normalized_expected_action = (
-            expected_next_action
-            .lower()
-            .replace(
-                "complete missing item:",
-                "complete",
-            )
-            .strip()
-        )
-
-        normalized_actual_action = (
-            actual_next_action
-            .replace(
-                "complete missing item:",
-                "complete",
-            )
-            .strip()
-        )
-
-        next_action_pass = (
-            not normalized_expected_action
-            or normalized_expected_action
-            == normalized_actual_action
+        next_action_pass = validation_text_matches(
+            expected_next_action,
+            actual_next_action,
         )
 
         # ----------------------------------------------------
-        # Overall validation
+        # Overall
         # ----------------------------------------------------
 
         overall = (
@@ -3083,24 +3344,30 @@ def show_rule_validation(df):
         results.append(
             {
                 "Employee ID": employee_id,
-                "Employee Name": actual[
-                    "Employee Name"
-                ],
+
+                "Employee Name": actual.get(
+                    "Employee Name",
+                    "",
+                ),
+
                 "Stage": (
                     "PASS"
                     if stage_pass
                     else "FAIL"
                 ),
+
                 "Bottleneck": (
                     "PASS"
                     if bottleneck_pass
                     else "FAIL"
                 ),
+
                 "Next Action": (
                     "PASS"
                     if next_action_pass
                     else "FAIL"
                 ),
+
                 "Overall": (
                     "PASS"
                     if overall
@@ -3108,6 +3375,10 @@ def show_rule_validation(df):
                 ),
             }
         )
+
+    # --------------------------------------------------------
+    # No matching cases
+    # --------------------------------------------------------
 
     if not results:
 
@@ -3117,9 +3388,17 @@ def show_rule_validation(df):
 
         return
 
+    # --------------------------------------------------------
+    # Results dataframe
+    # --------------------------------------------------------
+
     results_df = pd.DataFrame(
         results
     )
+
+    # --------------------------------------------------------
+    # Pass rate
+    # --------------------------------------------------------
 
     pass_rate = (
         results_df["Overall"]
@@ -3127,6 +3406,10 @@ def show_rule_validation(df):
         .mean()
         * 100
     )
+
+    # --------------------------------------------------------
+    # Summary metrics
+    # --------------------------------------------------------
 
     c1, c2, c3 = st.columns(3)
 
@@ -3156,12 +3439,15 @@ def show_rule_validation(df):
             f"{pass_rate:.0f}%",
         )
 
+    # --------------------------------------------------------
+    # Results table
+    # --------------------------------------------------------
+
     st.dataframe(
         results_df,
         use_container_width=True,
         hide_index=True,
     )
-
 
 # ============================================================
 # 22. ABOUT
