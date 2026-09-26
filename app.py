@@ -189,7 +189,12 @@ def _coerce_date(series):
 
 
 def validate_schema(df):
-    missing = [column for column in RAW_REQUIRED if column not in df.columns]
+    missing = [
+        column
+        for column in RAW_REQUIRED
+        if column not in df.columns
+    ]
+
     return missing
 
 
@@ -216,21 +221,28 @@ def analyze_rows(df, as_of_date=None):
         if column not in df.columns:
             df[column] = ""
 
-    start_dates = _coerce_date(df["Start Date"])
+    start_dates = _coerce_date(
+        df["Start Date"]
+    )
 
     df["Start Date"] = start_dates
+
     df["Start Date Parse Status"] = np.where(
         start_dates.notna(),
         "Valid",
         "Missing / Invalid",
     )
 
-    df["Imported Days to Start"] = _calculate_days_to_start(
-        start_dates,
-        as_of_date,
+    df["Imported Days to Start"] = (
+        _calculate_days_to_start(
+            start_dates,
+            as_of_date,
+        )
     )
 
-    df["Days to Start"] = df["Imported Days to Start"]
+    df["Days to Start"] = (
+        df["Imported Days to Start"]
+    )
 
     readiness_percentages = []
     readiness_ready = []
@@ -253,19 +265,31 @@ def analyze_rows(df, as_of_date=None):
         missing_core = [
             item
             for item in CORE_CHECKLIST
-            if not _is_complete(row.get(item, ""))
+            if not _is_complete(
+                row.get(item, "")
+            )
         ]
 
-        completed_core = len(CORE_CHECKLIST) - len(missing_core)
+        completed_core = (
+            len(CORE_CHECKLIST)
+            - len(missing_core)
+        )
 
         readiness = (
-            completed_core / len(CORE_CHECKLIST) * 100
+            completed_core
+            / len(CORE_CHECKLIST)
+            * 100
             if CORE_CHECKLIST
             else 0
         )
 
-        readiness_percentages.append(round(readiness, 1))
-        readiness_ready.append(len(missing_core) == 0)
+        readiness_percentages.append(
+            round(readiness, 1)
+        )
+
+        readiness_ready.append(
+            len(missing_core) == 0
+        )
 
         # ----------------------------------------------------
         # Payroll
@@ -274,20 +298,48 @@ def analyze_rows(df, as_of_date=None):
         missing_payroll = [
             item
             for item in PAYROLL_PREREQS
-            if not _is_complete(row.get(item, ""))
+            if not _is_complete(
+                row.get(item, "")
+            )
         ]
 
         # ----------------------------------------------------
         # System / workflow status
         # ----------------------------------------------------
 
-        hris_created = _created(row.get("HRIS Employee ID", ""))
-        payroll_created = _created(row.get("Payroll Screens", ""))
-        hr_notified_it = _yes(row.get("HR Notified IT", ""))
-        it_access = _yes(row.get("IT Email/System Access", ""))
+        hris_created = _created(
+            row.get(
+                "HRIS Employee ID",
+                "",
+            )
+        )
+
+        payroll_created = _created(
+            row.get(
+                "Payroll Screens",
+                "",
+            )
+        )
+
+        hr_notified_it = _yes(
+            row.get(
+                "HR Notified IT",
+                "",
+            )
+        )
+
+        it_access = _yes(
+            row.get(
+                "IT Email/System Access",
+                "",
+            )
+        )
 
         safe_colleges_complete = _is_complete(
-            row.get("SafeColleges", "")
+            row.get(
+                "SafeColleges",
+                "",
+            )
         )
 
         # ----------------------------------------------------
@@ -364,17 +416,21 @@ def analyze_rows(df, as_of_date=None):
 
             bottleneck = "Payroll prerequisites"
             blocked_task = "Payroll readiness"
+
             next_action = (
                 "Complete missing payroll documents: "
                 + ", ".join(missing_payroll)
             )
+
             responsible = "HR / New Hire"
 
         elif stage == "IT Provisioning":
 
             bottleneck = "IT system access"
             blocked_task = "System access"
-            next_action = "Complete email and system access"
+            next_action = (
+                "Complete email and system access"
+            )
             responsible = "IT"
 
         elif stage == "Ready for IT Notification":
@@ -387,27 +443,39 @@ def analyze_rows(df, as_of_date=None):
         elif stage == "Compliance Pending":
 
             if not safe_colleges_complete:
+
                 bottleneck = "SafeColleges"
                 blocked_task = "Compliance completion"
-                next_action = "Complete SafeColleges training"
+                next_action = (
+                    "Complete SafeColleges training"
+                )
                 responsible = "New Hire"
+
             else:
+
                 bottleneck = (
                     missing_core[0]
                     if missing_core
                     else "Compliance review"
                 )
+
                 blocked_task = "Onboarding readiness"
+
                 next_action = (
                     "Complete remaining compliance items"
                 )
+
                 responsible = "HR / New Hire"
 
         elif stage == "Ready for HRIS Setup":
 
             bottleneck = "HRIS setup"
             blocked_task = "Employee system setup"
-            next_action = "Create HRIS employee ID and payroll screens"
+
+            next_action = (
+                "Create HRIS employee ID and payroll screens"
+            )
+
             responsible = "HR"
 
         elif stage == "Checklist In Progress":
@@ -417,18 +485,23 @@ def analyze_rows(df, as_of_date=None):
                 if missing_core
                 else "Core checklist"
             )
+
             blocked_task = "HRIS setup"
+
             next_action = (
                 "Complete missing item: "
                 + bottleneck
             )
+
             responsible = "HR / New Hire"
 
         else:
 
             bottleneck = "Onboarding initiation"
             blocked_task = "Core checklist"
-            next_action = "Begin onboarding checklist"
+            next_action = (
+                "Begin onboarding checklist"
+            )
             responsible = "HR"
 
         bottlenecks.append(bottleneck)
@@ -493,48 +566,56 @@ def analyze_rows(df, as_of_date=None):
         # ----------------------------------------------------
 
         if stage == "Fully Operational":
+
             explanation = (
                 "The employee has completed the core onboarding "
                 "requirements and required downstream system steps."
             )
 
         elif stage == "Exception / Payroll Risk":
+
             explanation = (
                 "HRIS and payroll setup are progressing before "
                 "all payroll prerequisites are complete."
             )
 
         elif stage == "IT Provisioning":
+
             explanation = (
                 "HR has notified IT, but the employee's email "
                 "and system access are not yet complete."
             )
 
         elif stage == "Ready for IT Notification":
+
             explanation = (
                 "Core onboarding and compliance requirements are "
                 "complete. The next dependency is HR notifying IT."
             )
 
         elif stage == "Compliance Pending":
+
             explanation = (
                 "Core onboarding is progressing, but compliance "
                 "requirements remain before downstream setup."
             )
 
         elif stage == "Ready for HRIS Setup":
+
             explanation = (
                 "Core requirements are complete and the employee "
                 "is ready for HRIS and payroll setup."
             )
 
         elif stage == "Checklist In Progress":
+
             explanation = (
                 "The onboarding checklist is incomplete. "
                 f"The current bottleneck is {bottleneck}."
             )
 
         else:
+
             explanation = (
                 "The onboarding workflow has not yet started."
             )
@@ -573,7 +654,10 @@ def prioritize_df(df):
     for _, row in df.iterrows():
 
         days = row.get("Days to Start")
-        stage = row.get("Current Stage", "")
+        stage = row.get(
+            "Current Stage",
+            "",
+        )
 
         if stage == "Fully Operational":
             priority = "Green"
@@ -592,9 +676,15 @@ def prioritize_df(df):
     df["Priority"] = priorities
 
     def priority_value(value):
-        return PRIORITY_ORDER.get(value, 9)
+        return PRIORITY_ORDER.get(
+            value,
+            9,
+        )
 
-    df["_Priority Sort"] = df["Priority"].map(priority_value)
+    df["_Priority Sort"] = (
+        df["Priority"]
+        .map(priority_value)
+    )
 
     df["_Workflow Sort"] = (
         df["Current Stage"]
@@ -602,10 +692,13 @@ def prioritize_df(df):
         .fillna(0)
     )
 
-    df["_Days Sort"] = pd.to_numeric(
-        df["Days to Start"],
-        errors="coerce",
-    ).fillna(9999)
+    df["_Days Sort"] = (
+        pd.to_numeric(
+            df["Days to Start"],
+            errors="coerce",
+        )
+        .fillna(9999)
+    )
 
     df["_Employee Sort"] = (
         df["Employee Name"]
@@ -641,24 +734,42 @@ def prioritize_df(df):
 # ============================================================
 
 def _directory_email(row):
-    return _norm(row.get("Employee Email", ""))
+    return _norm(
+        row.get(
+            "Employee Email",
+            "",
+        )
+    )
 
 
 def resolve_recipient(row):
 
     preferred = _norm(
-        row.get("Preferred Reminder Channel", "")
+        row.get(
+            "Preferred Reminder Channel",
+            "",
+        )
     ).lower()
 
     employee_email = _directory_email(row)
+
     supervisor_email = _norm(
-        row.get("Supervisor Email", "")
+        row.get(
+            "Supervisor Email",
+            "",
+        )
     )
 
-    if preferred == "supervisor" and supervisor_email:
+    if (
+        preferred == "supervisor"
+        and supervisor_email
+    ):
         return supervisor_email
 
-    if preferred == "employee" and employee_email:
+    if (
+        preferred == "employee"
+        and employee_email
+    ):
         return employee_email
 
     if employee_email:
@@ -671,7 +782,13 @@ def resolve_recipient(row):
 
 
 def suggested_subject(row):
-    employee_name = _norm(row.get("Employee Name", "Employee"))
+
+    employee_name = _norm(
+        row.get(
+            "Employee Name",
+            "Employee",
+        )
+    )
 
     return (
         f"Onboarding follow-up required — {employee_name}"
@@ -680,23 +797,52 @@ def suggested_subject(row):
 
 def deterministic_reminder(row):
 
-    employee_name = _norm(row.get("Employee Name", "Employee"))
-    stage = _norm(row.get("Current Stage", ""))
-    next_action = _norm(row.get("Next Action", ""))
-    days = row.get("Days to Start")
+    employee_name = _norm(
+        row.get(
+            "Employee Name",
+            "Employee",
+        )
+    )
+
+    stage = _norm(
+        row.get(
+            "Current Stage",
+            "",
+        )
+    )
+
+    next_action = _norm(
+        row.get(
+            "Next Action",
+            "",
+        )
+    )
+
+    days = row.get(
+        "Days to Start"
+    )
 
     if pd.isna(days):
-        timing = "Please review the onboarding timeline."
+
+        timing = (
+            "Please review the onboarding timeline."
+        )
+
     elif days < 0:
+
         timing = (
             "The employee's start date has already passed, "
             "so this item should be addressed immediately."
         )
+
     elif days <= 7:
+
         timing = (
             "The employee is scheduled to start within 7 days."
         )
+
     else:
+
         timing = (
             f"The employee is scheduled to start in approximately "
             f"{int(days)} days."
@@ -722,7 +868,9 @@ def deterministic_reminder(row):
 
 def _extract_sheet_id(sheet_url_or_id):
 
-    value = _norm(sheet_url_or_id)
+    value = _norm(
+        sheet_url_or_id
+    )
 
     if not value:
         return None
@@ -730,10 +878,13 @@ def _extract_sheet_id(sheet_url_or_id):
     if "docs.google.com/spreadsheets/d/" in value:
 
         try:
+
             return value.split(
                 "/spreadsheets/d/"
             )[1].split("/")[0]
+
         except Exception:
+
             return None
 
     return value
@@ -744,9 +895,12 @@ def read_public_google_sheet(
     worksheet_name="Employee_Data",
 ):
 
-    sheet_id = _extract_sheet_id(sheet_url_or_id)
+    sheet_id = _extract_sheet_id(
+        sheet_url_or_id
+    )
 
     if not sheet_id:
+
         raise ValueError(
             "A valid Google Sheet URL or ID is required."
         )
@@ -769,7 +923,9 @@ def read_public_google_sheet(
     response.raise_for_status()
 
     return pd.read_csv(
-        io.StringIO(response.text)
+        io.StringIO(
+            response.text
+        )
     )
 
 
@@ -793,10 +949,6 @@ st.markdown(
     """
     <style>
 
-    /* ------------------------------------------------------
-       GLOBAL
-    ------------------------------------------------------ */
-
     .stApp {
         background-color: #f5f5f5;
     }
@@ -818,10 +970,6 @@ st.markdown(
         color: #3f3f3f;
     }
 
-    /* ------------------------------------------------------
-       BUTTONS
-    ------------------------------------------------------ */
-
     .stButton > button {
         border-radius: 8px;
         border: 1px solid #111111;
@@ -833,10 +981,6 @@ st.markdown(
         border-color: #f4c542;
         color: #111111;
     }
-
-    /* ------------------------------------------------------
-       METRICS
-    ------------------------------------------------------ */
 
     [data-testid="stMetric"] {
         background-color: #ffffff;
@@ -855,26 +999,14 @@ st.markdown(
         font-weight: 700;
     }
 
-    /* ------------------------------------------------------
-       TABLES
-    ------------------------------------------------------ */
-
     [data-testid="stDataFrame"] {
         border: 1px solid #dddddd;
         border-radius: 8px;
     }
 
-    /* ------------------------------------------------------
-       SIDEBAR
-    ------------------------------------------------------ */
-
     [data-testid="stSidebar"] .stRadio label {
         font-weight: 500;
     }
-
-    /* ------------------------------------------------------
-       PROGRESS
-    ------------------------------------------------------ */
 
     [data-testid="stProgressBar"] > div > div > div {
         background-color: #f4c542;
@@ -1001,7 +1133,6 @@ NAV_OPTIONS = [
     "Communications",
     "Rule Validation",
     "Data Management",
-    #"Employee Profile",
     "About",
 ]
 
@@ -1027,8 +1158,9 @@ def show_sidebar():
 
         st.divider()
 
-        # changing below 
-        current_navigation_view = st.session_state.main_view
+        current_navigation_view = (
+            st.session_state.main_view
+        )
 
         if current_navigation_view == "Employee Profile":
             current_navigation_view = "Employee Directory"
@@ -1044,17 +1176,16 @@ def show_sidebar():
             ),
             label_visibility="collapsed",
         )
-#changing above
-        #if selected != st.session_state.main_view:
-            #st.session_state.main_view = selected
-            #st.rerun()
+
         if (
-            st.session_state.main_view != "Employee Profile"
-            and selected != st.session_state.main_view
+            st.session_state.main_view
+            != "Employee Profile"
+            and selected
+            != st.session_state.main_view
         ):
+
             st.session_state.main_view = selected
             st.rerun()
-            ### changing above 2.0
 
         st.divider()
 
@@ -1066,7 +1197,9 @@ def show_sidebar():
             label_visibility="collapsed",
         )
 
-        st.session_state.control_date = control_date
+        st.session_state.control_date = (
+            control_date
+        )
 
         st.divider()
 
@@ -1079,6 +1212,7 @@ def show_sidebar():
             "Sign out",
             use_container_width=True,
         ):
+
             st.session_state.authenticated = False
             st.rerun()
 
@@ -1089,16 +1223,21 @@ def show_sidebar():
 
 def load_excel(uploaded_file):
 
-    excel = pd.ExcelFile(uploaded_file)
+    excel = pd.ExcelFile(
+        uploaded_file
+    )
 
     sheet_names = excel.sheet_names
 
     if "Employee_Data" in sheet_names:
+
         employee_df = pd.read_excel(
             uploaded_file,
             sheet_name="Employee_Data",
         )
+
     else:
+
         employee_df = pd.read_excel(
             uploaded_file,
             sheet_name=sheet_names[0],
@@ -1108,20 +1247,31 @@ def load_excel(uploaded_file):
     contact_directory_df = None
 
     if "Test_Cases" in sheet_names:
+
         test_cases_df = pd.read_excel(
             uploaded_file,
             sheet_name="Test_Cases",
         )
 
     if "Contact_Directory" in sheet_names:
+
         contact_directory_df = pd.read_excel(
             uploaded_file,
             sheet_name="Contact_Directory",
         )
 
-    st.session_state.employee_df = employee_df
-    st.session_state.test_cases_df = test_cases_df
-    st.session_state.contact_directory_df = contact_directory_df
+    st.session_state.employee_df = (
+        employee_df
+    )
+
+    st.session_state.test_cases_df = (
+        test_cases_df
+    )
+
+    st.session_state.contact_directory_df = (
+        contact_directory_df
+    )
+
     st.session_state.data_source = (
         "Excel workbook"
     )
@@ -1138,28 +1288,45 @@ def load_google_data(sheet_url):
     contact_directory_df = None
 
     try:
+
         test_cases_df = read_public_google_sheet(
             sheet_url,
             "Test_Cases",
         )
+
     except Exception:
+
         pass
 
     try:
+
         contact_directory_df = read_public_google_sheet(
             sheet_url,
             "Contact_Directory",
         )
+
     except Exception:
+
         pass
 
-    st.session_state.employee_df = employee_df
-    st.session_state.test_cases_df = test_cases_df
-    st.session_state.contact_directory_df = contact_directory_df
+    st.session_state.employee_df = (
+        employee_df
+    )
+
+    st.session_state.test_cases_df = (
+        test_cases_df
+    )
+
+    st.session_state.contact_directory_df = (
+        contact_directory_df
+    )
+
     st.session_state.data_source = (
         "Live Google Sheet"
     )
+
     st.session_state.google_sheet_loaded = True
+
     st.session_state.google_sheet_last_refresh = (
         datetime.now()
     )
@@ -1194,7 +1361,10 @@ def show_data_management():
 
         uploaded_file = st.file_uploader(
             "Choose Excel file",
-            type=["xlsx", "xls"],
+            type=[
+                "xlsx",
+                "xls",
+            ],
         )
 
         if uploaded_file is not None:
@@ -1206,7 +1376,9 @@ def show_data_management():
 
                 try:
 
-                    load_excel(uploaded_file)
+                    load_excel(
+                        uploaded_file
+                    )
 
                     st.success(
                         "Employee data loaded successfully."
@@ -1231,11 +1403,15 @@ def show_data_management():
 
         google_url = st.text_input(
             "Google Sheet URL",
-            value=st.session_state.google_sheet_url,
+            value=(
+                st.session_state.google_sheet_url
+            ),
             placeholder="Paste Google Sheets URL here",
         )
 
-        st.session_state.google_sheet_url = google_url
+        st.session_state.google_sheet_url = (
+            google_url
+        )
 
         if st.button(
             "Load / Refresh Google Sheet",
@@ -1285,18 +1461,21 @@ def show_data_management():
         c1, c2, c3 = st.columns(3)
 
         with c1:
+
             st.metric(
                 "Employees loaded",
                 len(df),
             )
 
         with c2:
+
             st.metric(
                 "Columns",
                 len(df.columns),
             )
 
         with c3:
+
             st.metric(
                 "Source",
                 st.session_state.data_source
@@ -1315,7 +1494,9 @@ def show_data_management():
                 )
             )
 
-        missing = validate_schema(df)
+        missing = validate_schema(
+            df
+        )
 
         if missing:
 
@@ -1365,7 +1546,10 @@ def employee_choices(df):
     )
 
 
-def get_employee(df, employee_id):
+def get_employee(
+    df,
+    employee_id,
+):
 
     if df is None or df.empty:
         return None
@@ -1387,10 +1571,15 @@ def format_date(value):
         return "Not available"
 
     try:
-        return pd.Timestamp(value).strftime(
+
+        return pd.Timestamp(
+            value
+        ).strftime(
             "%b %d, %Y"
         )
+
     except Exception:
+
         return str(value)
 
 
@@ -1432,7 +1621,13 @@ def show_readiness(df):
     )
 
     st.progress(
-        min(max(value / 100, 0), 1)
+        min(
+            max(
+                value / 100,
+                0,
+            ),
+            1,
+        )
     )
 
     st.caption(
@@ -1444,7 +1639,10 @@ def show_readiness(df):
 # 14. PAGE HEADER
 # ============================================================
 
-def page_header(title, subtitle=None):
+def page_header(
+    title,
+    subtitle=None,
+):
 
     st.title(title)
 
@@ -1463,13 +1661,17 @@ def show_overview(df):
     total_employees = len(df)
 
     ready_count = int(
-        (df["Current Stage"] == "Fully Operational")
-        .sum()
+        (
+            df["Current Stage"]
+            == "Fully Operational"
+        ).sum()
     )
 
     critical_count = int(
-        (df["Risk Level"] == "Critical")
-        .sum()
+        (
+            df["Risk Level"]
+            == "Critical"
+        ).sum()
     )
 
     pending_count = int(
@@ -1503,30 +1705,35 @@ def show_overview(df):
     c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
+
         st.metric(
             "Employees",
             total_employees,
         )
 
     with c2:
+
         st.metric(
             "Ready",
             ready_count,
         )
 
     with c3:
+
         st.metric(
             "Needs Attention",
             pending_count,
         )
 
     with c4:
+
         st.metric(
             "Critical",
             critical_count,
         )
 
     with c5:
+
         st.metric(
             "Avg. Readiness",
             f"{avg_checklist:.0f}%",
@@ -1548,7 +1755,9 @@ def show_overview(df):
 
         with st.container(border=True):
 
-            st.markdown("### Onboarding Status")
+            st.markdown(
+                "### Onboarding Status"
+            )
 
             stage_counts = (
                 df["Current Stage"]
@@ -1573,11 +1782,16 @@ def show_overview(df):
 
         with st.container(border=True):
 
-            st.markdown("### Action Needed")
+            st.markdown(
+                "### Action Needed"
+            )
 
             attention_df = df[
                 df["Priority"].isin(
-                    ["Red", "Yellow"]
+                    [
+                        "Red",
+                        "Yellow",
+                    ]
                 )
             ].head(5)
 
@@ -1606,7 +1820,9 @@ def show_overview(df):
 
         with st.container(border=True):
 
-            st.markdown("### Search Employee")
+            st.markdown(
+                "### Search Employee"
+            )
 
             search = st.text_input(
                 "Search",
@@ -1618,7 +1834,9 @@ def show_overview(df):
 
             if search:
 
-                search_text = search.lower()
+                search_text = (
+                    search.lower()
+                )
 
                 matches = df[
                     df["Employee Name"]
@@ -1660,7 +1878,9 @@ def show_overview(df):
                             row["Employee Name"],
                             key=(
                                 "overview_employee_"
-                                + str(row["Employee ID"])
+                                + str(
+                                    row["Employee ID"]
+                                )
                             ),
                             use_container_width=True,
                         ):
@@ -1681,11 +1901,16 @@ def show_overview(df):
     # Priority queue
     # --------------------------------------------------------
 
-    st.subheader("Priority Queue")
+    st.subheader(
+        "Priority Queue"
+    )
 
     queue = df[
         df["Priority"].isin(
-            ["Red", "Yellow"]
+            [
+                "Red",
+                "Yellow",
+            ]
         )
     ].head(10)
 
@@ -1711,13 +1936,15 @@ def show_overview(df):
             ]
         ].copy()
 
-        display["Start Date"] = display[
-            "Start Date"
-        ].apply(format_date)
+        display["Start Date"] = (
+            display["Start Date"]
+            .apply(format_date)
+        )
 
-        display["Priority"] = display[
-            "Priority"
-        ].apply(priority_badge_text)
+        display["Priority"] = (
+            display["Priority"]
+            .apply(priority_badge_text)
+        )
 
         st.dataframe(
             display,
@@ -1785,7 +2012,9 @@ def show_employee_directory(df):
 
     if search:
 
-        search_text = search.lower()
+        search_text = (
+            search.lower()
+        )
 
         filtered = filtered[
             filtered["Employee Name"]
@@ -1860,7 +2089,8 @@ def show_employee_directory(df):
                 st.progress(
                     float(
                         row["Core Checklist %"]
-                    ) / 100
+                    )
+                    / 100
                 )
 
                 st.caption(
@@ -1873,7 +2103,9 @@ def show_employee_directory(df):
                     "View employee",
                     key=(
                         "directory_view_"
-                        + str(row["Employee ID"])
+                        + str(
+                            row["Employee ID"]
+                        )
                     ),
                     use_container_width=True,
                 ):
@@ -1905,7 +2137,9 @@ def show_employee_profile(df):
             "Select an employee from the Employee Directory."
         )
 
-        if st.button("Go to Employee Directory"):
+        if st.button(
+            "Go to Employee Directory"
+        ):
 
             st.session_state.main_view = (
                 "Employee Directory"
@@ -1928,7 +2162,9 @@ def show_employee_profile(df):
 
         return
 
-    if st.button("← Back to Employee Directory"):
+    if st.button(
+        "← Back to Employee Directory"
+    ):
 
         st.session_state.main_view = (
             "Employee Directory"
@@ -1939,7 +2175,9 @@ def show_employee_profile(df):
     st.write("")
 
     st.title(
-        str(row["Employee Name"])
+        str(
+            row["Employee Name"]
+        )
     )
 
     st.caption(
@@ -1952,36 +2190,45 @@ def show_employee_profile(df):
     c1, c2, c3, c4, c5 = st.columns(5)
 
     with c1:
+
         st.metric(
             "Start Date",
-            format_date(row["Start Date"]),
+            format_date(
+                row["Start Date"]
+            ),
         )
 
     with c2:
+
         st.metric(
             "Readiness",
             f"{row['Core Checklist %']:.0f}%",
         )
 
     with c3:
+
         st.metric(
             "Risk",
             row["Risk Level"],
         )
 
     with c4:
+
         st.metric(
             "Stage",
             row["Current Stage"],
         )
 
     with c5:
+
         days = row["Days to Start"]
 
         if pd.isna(days):
             value = "N/A"
         else:
-            value = str(int(days))
+            value = str(
+                int(days)
+            )
 
         st.metric(
             "Days to Start",
@@ -1994,13 +2241,17 @@ def show_employee_profile(df):
     # Workflow intelligence
     # --------------------------------------------------------
 
-    st.subheader("Workflow Intelligence")
+    st.subheader(
+        "Workflow Intelligence"
+    )
 
     c1, c2, c3 = st.columns(3)
 
     with c1:
 
-        st.markdown("**Primary Bottleneck**")
+        st.markdown(
+            "**Primary Bottleneck**"
+        )
 
         st.write(
             row["Primary Bottleneck"]
@@ -2008,7 +2259,9 @@ def show_employee_profile(df):
 
     with c2:
 
-        st.markdown("**Next Action**")
+        st.markdown(
+            "**Next Action**"
+        )
 
         st.write(
             row["Next Action"]
@@ -2016,7 +2269,9 @@ def show_employee_profile(df):
 
     with c3:
 
-        st.markdown("**Responsible Party**")
+        st.markdown(
+            "**Responsible Party**"
+        )
 
         st.write(
             row["Responsible Party"]
@@ -2024,12 +2279,15 @@ def show_employee_profile(df):
 
     st.write("")
 
-    st.markdown("**Readiness**")
+    st.markdown(
+        "**Readiness**"
+    )
 
     st.progress(
         float(
             row["Core Checklist %"]
-        ) / 100
+        )
+        / 100
     )
 
     st.caption(
@@ -2046,14 +2304,19 @@ def show_employee_profile(df):
     # Checklist
     # --------------------------------------------------------
 
-    st.subheader("Onboarding Checklist")
+    st.subheader(
+        "Onboarding Checklist"
+    )
 
     checklist_rows = []
 
     for item in CORE_CHECKLIST:
 
         completed = _is_complete(
-            row.get(item, "")
+            row.get(
+                item,
+                "",
+            )
         )
 
         checklist_rows.append(
@@ -2081,7 +2344,9 @@ def show_employee_profile(df):
     # System readiness
     # --------------------------------------------------------
 
-    st.subheader("System Readiness")
+    st.subheader(
+        "System Readiness"
+    )
 
     system_rows = []
 
@@ -2094,7 +2359,10 @@ def show_employee_profile(df):
 
     for item in system_items:
 
-        value = row.get(item, "")
+        value = row.get(
+            item,
+            "",
+        )
 
         system_rows.append(
             {
@@ -2121,7 +2389,9 @@ def show_employee_profile(df):
     # Employee details
     # --------------------------------------------------------
 
-    with st.expander("Employee Details"):
+    with st.expander(
+        "Employee Details"
+    ):
 
         details = {
             "Employee ID": row.get(
@@ -2192,42 +2462,58 @@ def show_risk_monitor(df):
     )
 
     critical = int(
-        (df["Risk Level"] == "Critical").sum()
+        (
+            df["Risk Level"]
+            == "Critical"
+        ).sum()
     )
 
     high = int(
-        (df["Risk Level"] == "High").sum()
+        (
+            df["Risk Level"]
+            == "High"
+        ).sum()
     )
 
     medium = int(
-        (df["Risk Level"] == "Medium").sum()
+        (
+            df["Risk Level"]
+            == "Medium"
+        ).sum()
     )
 
     complete = int(
-        (df["Risk Level"] == "Complete").sum()
+        (
+            df["Risk Level"]
+            == "Complete"
+        ).sum()
     )
 
     c1, c2, c3, c4 = st.columns(4)
 
     with c1:
+
         st.metric(
             "Critical",
             critical,
         )
 
     with c2:
+
         st.metric(
             "High",
             high,
         )
 
     with c3:
+
         st.metric(
             "Medium",
             medium,
         )
 
     with c4:
+
         st.metric(
             "Complete",
             complete,
@@ -2281,13 +2567,15 @@ def show_risk_monitor(df):
         ]
     ].copy()
 
-    display["Start Date"] = display[
-        "Start Date"
-    ].apply(format_date)
+    display["Start Date"] = (
+        display["Start Date"]
+        .apply(format_date)
+    )
 
-    display["Priority"] = display[
-        "Priority"
-    ].apply(priority_badge_text)
+    display["Priority"] = (
+        display["Priority"]
+        .apply(priority_badge_text)
+    )
 
     st.dataframe(
         display,
@@ -2389,7 +2677,9 @@ def show_analytics(df):
     # Department performance
     # --------------------------------------------------------
 
-    st.subheader("Department Overview")
+    st.subheader(
+        "Department Overview"
+    )
 
     department_df = (
         df.groupby("Department")
@@ -2445,7 +2735,9 @@ def show_communications(df):
         "Generate a follow-up message based on the employee's current workflow status.",
     )
 
-    employee_ids = employee_choices(df)
+    employee_ids = employee_choices(
+        df
+    )
 
     if not employee_ids:
 
@@ -2460,9 +2752,7 @@ def show_communications(df):
         st.session_state.selected_employee_id,
     )
 
-    if (
-        default_id in employee_ids
-    ):
+    if default_id in employee_ids:
 
         default_index = employee_ids.index(
             default_id
@@ -2498,7 +2788,9 @@ def show_communications(df):
 
     with left:
 
-        st.subheader("Message")
+        st.subheader(
+            "Message"
+        )
 
         recipient = resolve_recipient(
             row
@@ -2562,7 +2854,9 @@ def show_communications(df):
 
     with right:
 
-        st.subheader("Workflow Context")
+        st.subheader(
+            "Workflow Context"
+        )
 
         st.metric(
             "Current Stage",
@@ -2597,8 +2891,13 @@ def show_communications(df):
         days = row["Days to Start"]
 
         if pd.isna(days):
-            st.write("Not available")
+
+            st.write(
+                "Not available"
+            )
+
         else:
+
             st.write(
                 f"{int(days)} days"
             )
@@ -2637,16 +2936,25 @@ def show_rule_validation(df):
 
         return
 
-    st.subheader("Validation Results")
+    st.subheader(
+        "Validation Results"
+    )
 
     results = []
 
     for _, test in test_cases.iterrows():
 
-        employee_id = (
-            test.get("Employee ID")
-            or test.get("HRIS Employee ID")
+        employee_id = test.get(
+            "Employee ID"
         )
+
+        if pd.isna(employee_id) or not _norm(
+            employee_id
+        ):
+
+            employee_id = test.get(
+                "HRIS Employee ID"
+            )
 
         if pd.isna(employee_id):
             continue
@@ -2696,6 +3004,10 @@ def show_rule_validation(df):
             )
         )
 
+        # ----------------------------------------------------
+        # Stage validation
+        # ----------------------------------------------------
+
         stage_pass = (
             not expected_stage
             or expected_stage
@@ -2703,6 +3015,10 @@ def show_rule_validation(df):
                 actual["Current Stage"]
             )
         )
+
+        # ----------------------------------------------------
+        # Bottleneck validation
+        # ----------------------------------------------------
 
         bottleneck_pass = (
             not expected_bottleneck
@@ -2712,71 +3028,51 @@ def show_rule_validation(df):
             )
         )
 
-        #next_action_pass = (
-         #   not expected_next_action
-          #  or expected_next_action
-           # == _norm(
-            #    actual["Next Action"]
-            #)
-        #)
+        # ----------------------------------------------------
+        # Next Action validation
+        # ----------------------------------------------------
+        # The prototype may produce:
+        #
+        # "Complete missing item: I-9"
+        #
+        # while the Test_Cases sheet may contain:
+        #
+        # "Complete I-9"
+        #
+        # We normalize both versions before comparing them.
 
-        # actual_next_action = _norm(
-        #     actual["Next Action"]
-        # )
-        # normalized_expected_action = (
-        #     expected_next_action
-        #     .replace(
-        #         "complete missing item:",
-        #         "complete"
-        #     )
-        #     .strip()
-        # )
-        
-        # normalized_actual_action = (
-        #     actual_next_action
-        #     .replace(
-        #         "complete missing item:",
-        #         "complete"
-        #     )
-        #     .strip()
-        # )
-        # next_action_pass = (
-        #     not normalized_expected_action
-        #     or normalized_expected_action
-        #     == normalized_actual_action
-        # )
-    ##
-    actual_next_action = _norm(
-        actual["Next Action"]
-    ).lower()
-    
-    normalized_expected_action = (
-        expected_next_action
-        .lower()
-        .replace(
-            "complete missing item:",
-            "complete"
+        actual_next_action = _norm(
+            actual["Next Action"]
+        ).lower()
+
+        normalized_expected_action = (
+            expected_next_action
+            .lower()
+            .replace(
+                "complete missing item:",
+                "complete",
+            )
+            .strip()
         )
-        .strip()
-    )
-    
-    normalized_actual_action = (
-        actual_next_action
-        .replace(
-            "complete missing item:",
-            "complete"
+
+        normalized_actual_action = (
+            actual_next_action
+            .replace(
+                "complete missing item:",
+                "complete",
+            )
+            .strip()
         )
-        .strip()
-    )
-    
-    next_action_pass = (
-        not normalized_expected_action
-        or normalized_expected_action
-        == normalized_actual_action
-    )
 
+        next_action_pass = (
+            not normalized_expected_action
+            or normalized_expected_action
+            == normalized_actual_action
+        )
 
-        # new code above
+        # ----------------------------------------------------
+        # Overall validation
+        # ----------------------------------------------------
 
         overall = (
             stage_pass
@@ -2835,12 +3131,14 @@ def show_rule_validation(df):
     c1, c2, c3 = st.columns(3)
 
     with c1:
+
         st.metric(
             "Test Cases",
             len(results_df),
         )
 
     with c2:
+
         st.metric(
             "Passed",
             int(
@@ -2852,6 +3150,7 @@ def show_rule_validation(df):
         )
 
     with c3:
+
         st.metric(
             "Pass Rate",
             f"{pass_rate:.0f}%",
@@ -2902,7 +3201,9 @@ def show_about():
 
     with c1:
 
-        st.subheader("Visibility")
+        st.subheader(
+            "Visibility"
+        )
 
         st.write(
             "Provides a centralized view of employee onboarding "
@@ -2911,7 +3212,9 @@ def show_about():
 
     with c2:
 
-        st.subheader("Risk Detection")
+        st.subheader(
+            "Risk Detection"
+        )
 
         st.write(
             "Highlights employees with approaching start dates, "
@@ -2920,7 +3223,9 @@ def show_about():
 
     with c3:
 
-        st.subheader("Action")
+        st.subheader(
+            "Action"
+        )
 
         st.write(
             "Identifies the next action and responsible party "
